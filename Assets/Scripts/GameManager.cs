@@ -23,6 +23,9 @@ public class GameManager : MonoBehaviour
     private int lives;
     private GameObject currentPlayer;
 
+    public int Score => score;
+    public bool IsGameOver { get; private set; }
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -92,14 +95,17 @@ public class GameManager : MonoBehaviour
 
     public void WinLevel()
     {
+        IsGameOver = true;
         if (winPanel != null)
         {
             winPanel.SetActive(true);
         }
+        Time.timeScale = 0f;
     }
 
     private void ShowLose()
     {
+        IsGameOver = true;
         if (winPanel != null)
         {
             winPanel.SetActive(false);
@@ -109,11 +115,19 @@ public class GameManager : MonoBehaviour
         {
             losePanel.SetActive(true);
         }
+        Time.timeScale = 0f;
     }
 
     public void RestartLevel()
     {
+        Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void LoadMainMenu()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
     }
 
     public void QuitGame()

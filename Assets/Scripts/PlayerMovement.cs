@@ -7,6 +7,7 @@ public class PlayerMovement : MonoBehaviour
 
     private Rigidbody2D rb;
     private bool isGrounded = false;
+    public bool IsGrounded => isGrounded;
 
     void Awake()
     {
