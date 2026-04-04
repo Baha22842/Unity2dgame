@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 959245846537808942}
   - component: {fileID: 5136286545505946188}
   - component: {fileID: 1393253350823255058}
+  - component: {fileID: 7682303756911881475}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -181,3 +182,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   speed: 5
   jumpForce: 7
+--- !u!114 &7682303756911881475
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8953799377486271065}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e45c4e023cb97424387d09b49eb24bce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerAnimator
+  idleSprites:
+  - {fileID: 21300000, guid: c04069ec3616d1840bfb0c4452e91fae, type: 3}
+  - {fileID: 21300000, guid: c1c46f287c1a5d34baf2cf0f158290a8, type: 3}
+  runSprites:
+  - {fileID: 21300000, guid: af82a2f7a96d3be4fbc0b72e01271368, type: 3}
+  - {fileID: 21300000, guid: 707626fc821db374d975d20e994c8da7, type: 3}
+  - {fileID: 21300000, guid: 408da53e3bf2bae4fbebef780f9f3d01, type: 3}
+  - {fileID: 21300000, guid: d0f47bca365947c4cb1772decc6435d5, type: 3}
+  - {fileID: 21300000, guid: 121fd4be73a64774ebc1b105ec60f369, type: 3}
+  - {fileID: 21300000, guid: a780f5b6d1f18b74daba31c4d0fce100, type: 3}
+  jumpUpSprite: {fileID: 21300000, guid: 336f3d5ef3478ab4aabd6f3060c94856, type: 3}
+  fallSprite: {fileID: 21300000, guid: 11fe0b561c3e2c74b8be458454c353c5, type: 3}
+  frameRate: 10

@@ -3,6 +3,7 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     public float speed = 5f;
+    public float runMultiplier = 1.5f;
     public float jumpForce = 7f;
 
     private Rigidbody2D rb;
@@ -17,7 +18,9 @@ public class PlayerMovement : MonoBehaviour
     void Update()
     {
         float moveX = Input.GetAxisRaw("Horizontal");
-        rb.linearVelocity = new Vector2(moveX * speed, rb.linearVelocity.y);
+        bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        float currentSpeed = isRunning ? speed * runMultiplier : speed;
+        rb.linearVelocity = new Vector2(moveX * currentSpeed, rb.linearVelocity.y);
 
         if (Input.GetButtonDown("Jump") && isGrounded)
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);

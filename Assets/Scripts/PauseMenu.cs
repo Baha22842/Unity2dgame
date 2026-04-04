@@ -7,6 +7,15 @@ public class PauseMenu : MonoBehaviour
 
     private bool isPaused = false;
 
+    private void Awake()
+    {
+        isPaused = false;
+        Time.timeScale = 1f;
+
+        if (pausePanel != null)
+            pausePanel.SetActive(false);
+    }
+
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -24,6 +33,9 @@ public class PauseMenu : MonoBehaviour
 
     public void Pause()
     {
+        if (isPaused)
+            return;
+
         isPaused = true;
         Time.timeScale = 0f;
         if (pausePanel != null)
@@ -32,6 +44,12 @@ public class PauseMenu : MonoBehaviour
 
     public void Resume()
     {
+        if (GameManager.Instance != null && GameManager.Instance.IsGameOver)
+            return;
+
+        if (!isPaused)
+            return;
+
         isPaused = false;
         Time.timeScale = 1f;
         if (pausePanel != null)
