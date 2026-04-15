@@ -58,6 +58,12 @@ public class PauseMenu : MonoBehaviour
 
     public void RestartLevel()
     {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.RestartLevel();
+            return;
+        }
+
         isPaused = false;
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

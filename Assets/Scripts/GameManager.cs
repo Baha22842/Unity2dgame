@@ -6,6 +6,23 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
+    private static bool hasSavedProgress;
+    private static int savedScore;
+    private static int savedLives;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void Init()
+    {
+        ResetProgress();
+    }
+
+    public static void ResetProgress()
+    {
+        hasSavedProgress = false;
+        savedScore = 0;
+        savedLives = 0;
+    }
+
     [Header("Player")]
     public Transform playerSpawnPoint;
     public GameObject playerPrefab;
@@ -45,7 +62,20 @@ public class GameManager : MonoBehaviour
             losePanel.SetActive(false);
         }
 
-        lives = startLives;
+        if (hasSavedProgress)
+        {
+            score = savedScore;
+            lives = savedLives;
+        }
+        else
+        {
+            score = 0;
+            lives = startLives;
+            hasSavedProgress = true;
+            savedScore = score;
+            savedLives = lives;
+        }
+
         UpdateLivesUI();
         UpdateScoreUI();
 
@@ -68,12 +98,14 @@ public class GameManager : MonoBehaviour
     public void AddScore(int amount)
     {
         score += amount;
+        savedScore = score;
         UpdateScoreUI();
     }
 
     public void PlayerDied()
     {
         lives--;
+        savedLives = lives;
         UpdateLivesUI();
 
         if (lives <= 0)
@@ -120,8 +152,25 @@ public class GameManager : MonoBehaviour
 
     public void RestartLevel()
     {
+        ResetProgress();
         Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void LoadNextLevel()
+    {
+        Time.timeScale = 1f;
+        IsGameOver = false;
+
+        int nextIndex = SceneManager.GetActiveScene().buildIndex + 1;
+        if (nextIndex < SceneManager.sceneCountInBuildSettings)
+        {
+            SceneManager.LoadScene(nextIndex);
+        }
+        else
+        {
+            SceneManager.LoadScene("MainMenu");
+        }
     }
 
     public void LoadMainMenu()
