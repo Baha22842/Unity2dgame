@@ -8,9 +8,14 @@ public class PlayerAnimator : MonoBehaviour
     [Header("Run Animation")]
     public Sprite[] runSprites;
 
-    [Header("Jump Sprites")]
-    public Sprite jumpUpSprite;
-    public Sprite fallSprite;
+    [Header("Jump Animation")]
+    public Sprite[] jumpUpSprites;
+
+    [Header("Fall Animation")]
+    public Sprite[] fallSprites;
+
+    [Header("Attack Animation")]
+    public Sprite[] attackSprites;
 
     [Header("Settings")]
     public float frameRate = 10f;
@@ -18,6 +23,7 @@ public class PlayerAnimator : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Rigidbody2D rb;
     private PlayerMovement playerMovement;
+    private PlayerCombat playerCombat;
 
     private int currentFrame;
     private float frameTimer;
@@ -28,6 +34,7 @@ public class PlayerAnimator : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         playerMovement = GetComponent<PlayerMovement>();
+        playerCombat = GetComponent<PlayerCombat>();
     }
 
     private void Update()
@@ -46,20 +53,38 @@ public class PlayerAnimator : MonoBehaviour
         string newState;
         Sprite[] activeSprites = null;
 
-        if (!grounded)
+        if (playerCombat != null && playerCombat.IsAttacking)
         {
-            // Airborne: jump up or fall
-            newState = velocityY > 0.1f ? "JumpUp" : "Fall";
-        }
-        else if (Mathf.Abs(velocityX) > 0.1f)
-        {
-            newState = "Run";
-            activeSprites = runSprites;
+            newState = "Attack";
+            activeSprites = attackSprites;
         }
         else
         {
-            newState = "Idle";
-            activeSprites = idleSprites;
+
+            if (!grounded)
+            {
+                // Airborne: jump up or fall
+                if (velocityY > 0.1f)
+                {
+                    newState = "JumpUp";
+                    activeSprites = jumpUpSprites;
+                }
+                else
+                {
+                    newState = "Fall";
+                    activeSprites = fallSprites;
+                }
+            }
+            else if (Mathf.Abs(velocityX) > 0.1f)
+            {
+                newState = "Run";
+                activeSprites = runSprites;
+            }
+            else
+            {
+                newState = "Idle";
+                activeSprites = idleSprites;
+            }
         }
 
         // Reset frame on state change
@@ -70,24 +95,16 @@ public class PlayerAnimator : MonoBehaviour
             frameTimer = 0f;
         }
 
-        // Handle single-frame states (jump/fall)
-        if (currentState == "JumpUp")
-        {
-            if (jumpUpSprite != null)
-                spriteRenderer.sprite = jumpUpSprite;
-            return;
-        }
-
-        if (currentState == "Fall")
-        {
-            if (fallSprite != null)
-                spriteRenderer.sprite = fallSprite;
-            return;
-        }
-
-        // Animate multi-frame states (idle/run)
+        // Animate multi-frame states (idle/run/jump/fall)
         if (activeSprites == null || activeSprites.Length == 0)
             return;
+
+        // Single-frame shortcut
+        if (activeSprites.Length == 1)
+        {
+            spriteRenderer.sprite = activeSprites[0];
+            return;
+        }
 
         frameTimer += Time.deltaTime;
         if (frameTimer >= 1f / frameRate)
