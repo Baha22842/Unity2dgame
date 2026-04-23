@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Ground
   - Background
+  - Box
   layers:
   - Default
   - TransparentFX
@@ -13,8 +14,8 @@ TagManager:
   - Background
   - Water
   - UI
-  - 
-  - 
+  - EnemyAndInteractables
+  - Ground
   - 
   - 
   - 

@@ -7,15 +7,31 @@ public class Enemy : MonoBehaviour
 
     private Vector3 startPos;
     private int direction = 1;
+    private Rigidbody2D rb;
+    private SpriteRenderer spriteRenderer;
 
     private void Start()
     {
         startPos = transform.position;
+        rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     private void Update()
     {
-        transform.Translate(Vector2.right * direction * speed * Time.deltaTime);
+        if (rb != null)
+        {
+            rb.linearVelocity = new Vector2(direction * speed, rb.linearVelocity.y);
+        }
+        else
+        {
+            transform.Translate(Vector2.right * direction * speed * Time.deltaTime);
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.flipX = direction < 0;
+        }
 
         float dist = transform.position.x - startPos.x;
         if (dist >= patrolDistance)

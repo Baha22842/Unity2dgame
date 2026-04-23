@@ -6,21 +6,20 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    private static bool hasSavedProgress;
-    private static int savedScore;
-    private static int savedLives;
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void Init()
-    {
-        ResetProgress();
-    }
-
     public static void ResetProgress()
     {
-        hasSavedProgress = false;
-        savedScore = 0;
-        savedLives = 0;
+        SaveSystem.DeleteSave();
+        if (Instance != null)
+        {
+            Instance.score = 0;
+            Instance.lives = Instance.startLives;
+            Instance.SaveGameData();
+        }
+    }
+
+    public void SaveGameData()
+    {
+        SaveSystem.SaveGame(score, lives, SceneManager.GetActiveScene().buildIndex);
     }
 
     [Header("Player")]
@@ -62,18 +61,18 @@ public class GameManager : MonoBehaviour
             losePanel.SetActive(false);
         }
 
-        if (hasSavedProgress)
+        // Загружаем данные с жесткого диска вместо статических переменных
+        SaveData data = SaveSystem.LoadGame();
+        if (data != null)
         {
-            score = savedScore;
-            lives = savedLives;
+            score = data.score;
+            lives = data.lives;
         }
         else
         {
             score = 0;
             lives = startLives;
-            hasSavedProgress = true;
-            savedScore = score;
-            savedLives = lives;
+            SaveGameData();
         }
 
         UpdateLivesUI();
@@ -98,14 +97,14 @@ public class GameManager : MonoBehaviour
     public void AddScore(int amount)
     {
         score += amount;
-        savedScore = score;
+        SaveGameData();
         UpdateScoreUI();
     }
 
     public void PlayerDied()
     {
         lives--;
-        savedLives = lives;
+        SaveGameData();
         UpdateLivesUI();
 
         if (lives <= 0)
@@ -182,6 +181,22 @@ public class GameManager : MonoBehaviour
     public void QuitGame()
     {
         Application.Quit();
+    }
+
+    public void HitStop(float duration = 0.05f)
+    {
+        // Вызываем корутину для остановки времени (читерский прием для сочности игры)
+        StartCoroutine(HitStopRoutine(duration));
+    }
+
+    private System.Collections.IEnumerator HitStopRoutine(float duration)
+    {
+        Time.timeScale = 0.1f; // Замедляем время почти до нуля
+        yield return new WaitForSecondsRealtime(duration); // Ждем долю секунды реального времени
+        if (!IsGameOver) // Проверка: если за это время мы случайно не умерли
+        {
+            Time.timeScale = 1f; // Возвращаем обычное течение времени
+        }
     }
 
     private void UpdateScoreUI()

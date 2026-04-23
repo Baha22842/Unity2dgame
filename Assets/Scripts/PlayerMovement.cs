@@ -6,61 +6,92 @@ public class PlayerMovement : MonoBehaviour
     public float runMultiplier = 1.5f;
     public float jumpForce = 7f;
 
+    [Header("Детекция земли (Ground Check)")]
+    public Transform groundCheckPoint;
+    public float groundCheckRadius = 0.2f;
+    public LayerMask groundLayer;
+
+    [Header("Jump Buffer & Coyote Time")]
+    public float jumpBufferTime = 0.15f;
+    public float coyoteTime = 0.1f;
+
     private Rigidbody2D rb;
     private bool isGrounded = false;
     public bool IsGrounded => isGrounded;
 
+    private float jumpBufferTimer;
+    private float coyoteTimer;
+    private bool wasGroundedLastFrame;
+
+    private PlayerGrab playerGrab;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        playerGrab = GetComponent<PlayerGrab>();
     }
 
     void Update()
     {
+        CheckGrounded();
+
         float moveX = Input.GetAxisRaw("Horizontal");
         bool isRunning = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
         float currentSpeed = isRunning ? speed * runMultiplier : speed;
         rb.linearVelocity = new Vector2(moveX * currentSpeed, rb.linearVelocity.y);
 
-        if (Input.GetButtonDown("Jump") && isGrounded)
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-    }
+        // Jump buffer: remember jump input for a short time
+        if (Input.GetButtonDown("Jump"))
+            jumpBufferTimer = jumpBufferTime;
+        else
+            jumpBufferTimer -= Time.deltaTime;
 
-    // Проверяем касание земли
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (!collision.gameObject.CompareTag("Ground"))
-            return;
+        // Coyote time: grace period after leaving ground
+        if (isGrounded)
+            coyoteTimer = coyoteTime;
+        else if (wasGroundedLastFrame)
+            coyoteTimer = coyoteTime;
+        else
+            coyoteTimer -= Time.deltaTime;
 
-        if (HasGroundContact(collision))
-            isGrounded = true;
-    }
-
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        if (!collision.gameObject.CompareTag("Ground"))
-            return;
-
-        // Keep grounded only if we still have a valid contact from below.
-        isGrounded = HasGroundContact(collision);
-    }
-
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Ground"))
-            isGrounded = false;
-    }
-
-    private static bool HasGroundContact(Collision2D collision)
-    {
-        // A ground contact is one where the surface normal points upward.
-        // This prevents side-wall contacts from counting as grounded.
-        foreach (ContactPoint2D contact in collision.contacts)
+        // Execute jump if buffered and within coyote time
+        bool canJump = true;
+        if (playerGrab != null && playerGrab.IsHoldingBox)
         {
-            if (contact.normal.y > 0.5f)
-                return true;
+            canJump = false; // Блокируем прыжок, если держим тяжелую коробку
         }
 
-        return false;
+        if (jumpBufferTimer > 0f && coyoteTimer > 0f && canJump)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            jumpBufferTimer = 0f;
+            coyoteTimer = 0f;
+        }
+
+        wasGroundedLastFrame = isGrounded;
+    }
+
+    private void CheckGrounded()
+    {
+        if (groundCheckPoint != null)
+        {
+            // Проверяем, есть ли под ногами объекты со слоем groundLayer
+            isGrounded = Physics2D.OverlapCircle(groundCheckPoint.position, groundCheckRadius, groundLayer);
+        }
+        else
+        {
+            Debug.LogWarning("У Игрока не назначен Ground Check Point!");
+            isGrounded = false;
+        }
+    }
+
+    // Рисуем кружок детекции в редакторе для удобства
+    private void OnDrawGizmosSelected()
+    {
+        if (groundCheckPoint != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(groundCheckPoint.position, groundCheckRadius);
+        }
     }
 }
