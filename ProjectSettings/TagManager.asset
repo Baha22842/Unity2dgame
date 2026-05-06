@@ -7,6 +7,7 @@ TagManager:
   - Ground
   - Background
   - Box
+  - Ladder
   layers:
   - Default
   - TransparentFX
@@ -43,6 +44,9 @@ TagManager:
   m_SortingLayers:
   - name: Background
     uniqueID: 2389399401
+    locked: 0
+  - name: Background2
+    uniqueID: 394403021
     locked: 0
   - name: Default
     uniqueID: 0

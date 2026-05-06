@@ -17,9 +17,14 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    [Header("Навыки Игрока (Метроидвания)")]
+    public bool hasDoubleJump = false;
+    public bool hasDash = false;
+    public bool hasHeavyAttack = false;
+
     public void SaveGameData()
     {
-        SaveSystem.SaveGame(score, lives, SceneManager.GetActiveScene().buildIndex);
+        SaveSystem.SaveGame(score, lives, SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack);
     }
 
     [Header("Player")]
@@ -67,11 +72,17 @@ public class GameManager : MonoBehaviour
         {
             score = data.score;
             lives = data.lives;
+            hasDoubleJump = data.hasDoubleJump;
+            hasDash = data.hasDash;
+            hasHeavyAttack = data.hasHeavyAttack;
         }
         else
         {
             score = 0;
             lives = startLives;
+            hasDoubleJump = false;
+            hasDash = false;
+            hasHeavyAttack = false;
             SaveGameData();
         }
 
@@ -101,11 +112,45 @@ public class GameManager : MonoBehaviour
         UpdateScoreUI();
     }
 
+    public void UnlockAbility(string abilityName)
+    {
+        switch (abilityName)
+        {
+            case "DoubleJump": hasDoubleJump = true; break;
+            case "Dash": hasDash = true; break;
+            case "HeavyAttack": hasHeavyAttack = true; break;
+        }
+        SaveGameData();
+        Debug.Log("Разблокирован новый навык: " + abilityName);
+    }
+
     public void PlayerDied()
+    {
+        StartCoroutine(PlayerDiedRoutine());
+    }
+
+    private System.Collections.IEnumerator PlayerDiedRoutine()
     {
         lives--;
         SaveGameData();
         UpdateLivesUI();
+
+        if (currentPlayer != null)
+        {
+            PlayerAnimator pa = currentPlayer.GetComponent<PlayerAnimator>();
+            PlayerMovement pm = currentPlayer.GetComponent<PlayerMovement>();
+            
+            if (pm != null) 
+            {
+                pm.FreezeMovement(5f); // Замораживаем управление
+                pm.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero; // Останавливаем падение
+                pm.GetComponent<Rigidbody2D>().gravityScale = 0f; // Выключаем гравитацию
+            }
+            if (pa != null) pa.TriggerDie();
+        }
+
+        // Ждем 1 секунду, пока проигрывается анимация смерти
+        yield return new WaitForSeconds(1f);
 
         if (lives <= 0)
         {

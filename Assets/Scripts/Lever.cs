@@ -22,7 +22,7 @@ public class Lever : MonoBehaviour, IHittable
     }
 
     // Этот метод вызывается из PlayerCombat, когда меч касается Рычага
-    public void OnHit()
+    public void OnHit(bool isHeavyAttack = false)
     {
         // Переключаем состояние (вкл -> выкл, выкл -> вкл)
         isActivated = !isActivated;

@@ -4,6 +4,7 @@ public class PlayerCombat : MonoBehaviour
 {
     [Header("Attack")]
     public KeyCode attackKey = KeyCode.J;
+    public KeyCode heavyAttackKey = KeyCode.K; // Новая кнопка для тяжелой атаки
     public float attackDuration = 0.25f;
     public Transform attackPoint;
     public float attackRadius = 0.5f;
@@ -27,11 +28,15 @@ public class PlayerCombat : MonoBehaviour
 
         if (Input.GetKeyDown(attackKey))
         {
-            StartAttack();
+            StartAttack(false); // Легкая атака
+        }
+        else if (Input.GetKeyDown(heavyAttackKey) && GameManager.Instance != null && GameManager.Instance.hasHeavyAttack)
+        {
+            StartAttack(true); // Тяжелая атака
         }
     }
 
-    private void StartAttack()
+    private void StartAttack(bool isHeavy)
     {
         isAttacking = true;
         attackTimer = attackDuration;
@@ -53,11 +58,11 @@ public class PlayerCombat : MonoBehaviour
                 hasHitSomething = true;
             }
 
-            // 2. Проверяем, можно ли по этому ударить (например, Рычаг)
+            // 2. Проверяем, можно ли по этому ударить (например, Рычаг или Стена)
             IHittable hittableObj = hit.GetComponent<IHittable>();
             if (hittableObj != null)
             {
-                hittableObj.OnHit();
+                hittableObj.OnHit(isHeavy);
                 hasHitSomething = true;
             }
         }

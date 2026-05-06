@@ -7,7 +7,11 @@ public class SaveData
     public int score;
     public int lives;
     public int currentLevelIndex;
-    // Можно добавить сюда списки собранных ключей или открытых дверей
+    
+    // Навыки (Метроидвания)
+    public bool hasDoubleJump;
+    public bool hasDash;
+    public bool hasHeavyAttack;
 }
 
 public static class SaveSystem
@@ -17,13 +21,16 @@ public static class SaveSystem
         return Application.persistentDataPath + "/game_save.json";
     }
 
-    public static void SaveGame(int _score, int _lives, int _levelIndex)
+    public static void SaveGame(int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack)
     {
         SaveData data = new SaveData
         {
             score = _score,
             lives = _lives,
-            currentLevelIndex = _levelIndex
+            currentLevelIndex = _levelIndex,
+            hasDoubleJump = _doubleJump,
+            hasDash = _dash,
+            hasHeavyAttack = _heavyAttack
         };
 
         string json = JsonUtility.ToJson(data, true);
