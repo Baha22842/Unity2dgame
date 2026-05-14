@@ -12,7 +12,8 @@ public class GameManager : MonoBehaviour
         if (Instance != null)
         {
             Instance.score = 0;
-            Instance.lives = Instance.startLives;
+            Instance.currentHealth = Instance.maxHealth;
+            Instance.collectedArtifacts = 0;
             Instance.SaveGameData();
         }
     }
@@ -24,7 +25,8 @@ public class GameManager : MonoBehaviour
 
     public void SaveGameData()
     {
-        SaveSystem.SaveGame(score, lives, SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack);
+        // Мы сохраняем currentHealth в параметр lives, чтобы не ломать SaveSystem
+        SaveSystem.SaveGame(score, currentHealth, UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack, collectedArtifacts, exploredRooms);
     }
 
     [Header("Player")]
@@ -33,15 +35,23 @@ public class GameManager : MonoBehaviour
 
     [Header("UI")]
     public Text scoreText;
-    public Text livesText;
+    public GameObject[] healthPoints; // Массив квадратиков здоровья (вместо текста)
     public GameObject winPanel;
     public GameObject losePanel;
 
-    [Header("Gameplay")]
-    public int startLives = 3;
+    [Header("Сюжетные Артефакты (Ключи)")]
+    public int collectedArtifacts = 0;
+    public int requiredArtifacts = 3;
+    public GameObject[] artifactIcons; // Иконки ключей в UI (холст)
+
+    [Header("Карта (Метроидвания)")]
+    public System.Collections.Generic.List<string> exploredRooms = new System.Collections.Generic.List<string>();
+
+    [Header("Gameplay (Здоровье)")]
+    public int maxHealth = 5;
 
     private int score;
-    private int lives;
+    private int currentHealth;
     private GameObject currentPlayer;
 
     public int Score => score;
@@ -71,23 +81,31 @@ public class GameManager : MonoBehaviour
         if (data != null)
         {
             score = data.score;
-            lives = data.lives;
+            currentHealth = data.lives; // в старых сохранениях это lives
+            if (currentHealth <= 0) currentHealth = maxHealth; // защита от бага при загрузке мертвого перса
+
             hasDoubleJump = data.hasDoubleJump;
             hasDash = data.hasDash;
             hasHeavyAttack = data.hasHeavyAttack;
+
+            collectedArtifacts = data.collectedArtifacts;
+            exploredRooms = data.exploredRooms != null ? data.exploredRooms : new System.Collections.Generic.List<string>();
         }
         else
         {
             score = 0;
-            lives = startLives;
+            currentHealth = maxHealth;
             hasDoubleJump = false;
             hasDash = false;
             hasHeavyAttack = false;
+            collectedArtifacts = 0;
+            exploredRooms = new System.Collections.Generic.List<string>();
             SaveGameData();
         }
 
-        UpdateLivesUI();
+        UpdateHealthUI();
         UpdateScoreUI();
+        UpdateArtifactsUI();
 
         if (playerSpawnPoint != null && playerPrefab != null)
         {
@@ -124,16 +142,48 @@ public class GameManager : MonoBehaviour
         Debug.Log("Разблокирован новый навык: " + abilityName);
     }
 
+    // --- ЛОГИКА АРТЕФАКТОВ ---
+    public void CollectArtifact()
+    {
+        collectedArtifacts++;
+        if (collectedArtifacts > requiredArtifacts) collectedArtifacts = requiredArtifacts;
+        
+        UpdateArtifactsUI();
+        SaveGameData();
+        Debug.Log("Собран артефакт! Всего: " + collectedArtifacts + " / " + requiredArtifacts);
+    }
+
     public void PlayerDied()
     {
         StartCoroutine(PlayerDiedRoutine());
     }
 
+    public void Heal(int amount = 1)
+    {
+        currentHealth += amount;
+        if (currentHealth > maxHealth) currentHealth = maxHealth;
+        SaveGameData();
+        UpdateHealthUI();
+    }
+
+    public void TakeDamage(int amount)
+    {
+        currentHealth -= amount;
+        SaveGameData();
+        UpdateHealthUI();
+
+        if (currentHealth <= 0)
+        {
+            // Если здоровье упало до 0, запускаем смерть
+            StartCoroutine(PlayerDiedRoutine());
+        }
+    }
+
     private System.Collections.IEnumerator PlayerDiedRoutine()
     {
-        lives--;
+        currentHealth--;
         SaveGameData();
-        UpdateLivesUI();
+        UpdateHealthUI();
 
         if (currentPlayer != null)
         {
@@ -142,19 +192,24 @@ public class GameManager : MonoBehaviour
             
             if (pm != null) 
             {
-                pm.FreezeMovement(5f); // Замораживаем управление
-                pm.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero; // Останавливаем падение
-                pm.GetComponent<Rigidbody2D>().gravityScale = 0f; // Выключаем гравитацию
+                pm.Die(); // Новый метод, который полностью отключает кнопки
             }
             if (pa != null) pa.TriggerDie();
+        }
+
+        // Страховка: если игрок был поставлен на сцену вручную (и GameManager о нем не знал)
+        PlayerMovement[] allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+        foreach (var p in allPlayers)
+        {
+            p.Die();
         }
 
         // Ждем 1 секунду, пока проигрывается анимация смерти
         yield return new WaitForSeconds(1f);
 
-        if (lives <= 0)
+        if (currentHealth <= 0)
         {
-            ShowLose();
+            ShowLose(); // Экран смерти (можно убрать потом и сделать бесконечное возрождение)
         }
         else
         {
@@ -252,11 +307,39 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void UpdateLivesUI()
+    private void UpdateHealthUI()
     {
-        if (livesText != null)
+        if (healthPoints == null) return;
+
+        // Включаем квадратики в зависимости от currentHealth
+        for (int i = 0; i < healthPoints.Length; i++)
         {
-            livesText.text = "Lives: " + lives;
+            if (i < currentHealth)
+            {
+                healthPoints[i].SetActive(true); // Квадратик красный/активный
+            }
+            else
+            {
+                healthPoints[i].SetActive(false); // Квадратик пропал
+            }
+        }
+    }
+
+    private void UpdateArtifactsUI()
+    {
+        if (artifactIcons == null) return;
+
+        // Включаем ключи в интерфейсе
+        for (int i = 0; i < artifactIcons.Length; i++)
+        {
+            if (i < collectedArtifacts)
+            {
+                artifactIcons[i].SetActive(true); // Ключ найден
+            }
+            else
+            {
+                artifactIcons[i].SetActive(false); // Ключ пока не найден (или скрыт)
+            }
         }
     }
 }

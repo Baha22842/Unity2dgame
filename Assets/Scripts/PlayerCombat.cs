@@ -50,11 +50,20 @@ public class PlayerCombat : MonoBehaviour
 
         foreach (Collider2D hit in hits)
         {
-            // 1. Проверяем, враг ли это
+            // 1. Проверяем, враг ли это (обычный)
             Enemy enemy = hit.GetComponent<Enemy>();
             if (enemy != null)
             {
                 Destroy(enemy.gameObject);
+                hasHitSomething = true;
+            }
+
+            // Проверяем, босс ли это
+            Boss boss = hit.GetComponent<Boss>();
+            if (boss != null)
+            {
+                int damage = isHeavy ? 2 : 1; // Тяжелая атака наносит 2 урона, обычная 1
+                boss.TakeDamage(damage);
                 hasHitSomething = true;
             }
 

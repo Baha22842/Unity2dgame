@@ -41,7 +41,21 @@ public class PlayerAnimator : MonoBehaviour
         anim.SetBool("IsCrouching", playerMovement.IsCrouching);
         anim.SetBool("IsRollFalling", playerMovement.IsRollFalling);
 
-        // 3. Триггер приземления: срабатывает в МОМЕНТ касания земли, а не пока стоим
+        // 3. Умная пауза анимации на лестнице
+        if (playerMovement.IsClimbing)
+        {
+            // Если игрок висит на лестнице и не двигается, ставим анимацию на паузу
+            if (Mathf.Abs(rb.linearVelocity.y) > 0.1f || Mathf.Abs(rb.linearVelocity.x) > 0.1f)
+                anim.speed = 1f;
+            else
+                anim.speed = 0f;
+        }
+        else
+        {
+            anim.speed = 1f; // Для всех остальных анимаций скорость нормальная
+        }
+
+        // 4. Триггер приземления: срабатывает в МОМЕНТ касания земли, а не пока стоим
         bool isGroundedNow = playerMovement.IsGrounded;
         if (isGroundedNow && !wasGroundedLastFrame && rb.linearVelocity.y <= 0f)
         {
@@ -64,6 +78,11 @@ public class PlayerAnimator : MonoBehaviour
     public void TriggerPowerUp()
     {
         anim.SetTrigger("PowerUp");
+    }
+
+    public void TriggerHit()
+    {
+        anim.SetTrigger("Hit");
     }
 
     public void TriggerDie()

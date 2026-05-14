@@ -35,6 +35,10 @@ public class PlayerMovement : MonoBehaviour
 
     private float freezeTimer;
 
+    [Header("Неуязвимость (i-frames)")]
+    public float invincibilityDuration = 1f;
+    private float invincibilityTimer = 0f;
+
     [Header("Детекция земли (Ground Check)")]
     public Transform groundCheckPoint;
     public float groundCheckRadius = 0.2f;
@@ -59,6 +63,8 @@ public class PlayerMovement : MonoBehaviour
     private float dashTimeLeft;
     private float dashCooldownTimer;
 
+    private bool isDead = false;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -74,12 +80,72 @@ public class PlayerMovement : MonoBehaviour
 
     public void FreezeMovement(float duration)
     {
+        if (isDead) return;
         freezeTimer = duration;
+    }
+
+    public void Die()
+    {
+        isDead = true;
+        
+        // Полностью останавливаем персонажа
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.gravityScale = 0f;
+        }
+
+        // Отключаем скрипт атаки, чтобы мертвец не мог махать мечом
+        PlayerCombat combat = GetComponent<PlayerCombat>();
+        if (combat != null)
+        {
+            combat.enabled = false;
+        }
+    }
+
+    // Новый метод для получения урона и отбрасывания
+    public void TakeDamage(Vector2 damageSourcePosition)
+    {
+        // Защита от спама уроном (i-frames)
+        if (invincibilityTimer > 0f) return;
+        
+        // Даем неуязвимость на заданное время
+        invincibilityTimer = invincibilityDuration;
+
+        // Отменяем лазание по лестнице
+        isClimbing = false;
+        
+        // Высчитываем направление отбрасывания (от источника урона)
+        float knockbackDir = Mathf.Sign(transform.position.x - damageSourcePosition.x);
+        if (knockbackDir == 0) knockbackDir = 1f; // на всякий случай
+
+        // Отбрасываем игрока (вверх и в сторону)
+        rb.linearVelocity = new Vector2(knockbackDir * 5f, 5f);
+        
+        // Замораживаем управление на 0.4 секунды, чтобы он отлетел
+        FreezeMovement(0.4f);
+
+        // Запускаем анимацию получения урона
+        PlayerAnimator pa = GetComponent<PlayerAnimator>();
+        if (pa != null) pa.TriggerHit();
+
+        // Отнимаем ХП
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.TakeDamage(1); // Мы добавим этот метод в GameManager сейчас!
+        }
     }
 
     void Update()
     {
+        if (isDead) return; // Если мертв — вообще не читаем кнопки!
+
         CheckGrounded();
+
+        if (invincibilityTimer > 0f)
+        {
+            invincibilityTimer -= Time.deltaTime;
+        }
 
         if (freezeTimer > 0f)
         {

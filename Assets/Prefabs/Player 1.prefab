@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1557274252211703590}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: AttackPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -40,7 +40,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5987472655861989419}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: GroundCheck
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -78,7 +78,8 @@ GameObject:
   - component: {fileID: 3750053563042630712}
   - component: {fileID: 3113814018255004105}
   - component: {fileID: -802841642252608095}
-  m_Layer: 0
+  - component: {fileID: 995826001229789639}
+  m_Layer: 8
   m_Name: Player 1
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -195,8 +196,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.000001017044, y: 0.01191085}
-  m_Size: {x: 0.7291667, y: 1.2916666}
+  m_Offset: {x: 0.008984864, y: -0.016837716}
+  m_Size: {x: 0.4812107, y: 1.2701051}
   m_Direction: 0
 --- !u!50 &5136286545505946188
 Rigidbody2D:
@@ -243,8 +244,10 @@ MonoBehaviour:
   dashDuration: 0.2
   dashCooldown: 1
   climbSpeed: 5
+  crouchSpeedMultiplier: 0.5
+  invincibilityDuration: 1
   groundCheckPoint: {fileID: 5987472655861989419}
-  groundCheckRadius: 0.2
+  groundCheckRadius: 0.3
   groundLayer:
     serializedVersion: 2
     m_Bits: 192
@@ -262,7 +265,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ca2eccf237e209145aff538a17972618, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCombat
-  attackKey: 106
+  attackKey: 323
   heavyAttackKey: 107
   attackDuration: 0.35
   attackPoint: {fileID: 1557274252211703590}
@@ -304,3 +307,15 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &995826001229789639
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8953799377486271065}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8e7a6bd59eb4af49aa4959b69b712ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraTarget

@@ -57,9 +57,12 @@ public class Enemy : MonoBehaviour
         }
         else
         {
-            // Игрок задел врага сбоку/снизу — умирает
-            if (GameManager.Instance != null)
-                GameManager.Instance.PlayerDied();
+            // Игрок задел врага сбоку/снизу — получает урон и отбрасывается
+            PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                pm.TakeDamage(transform.position); // Передаем позицию врага, чтобы отбросить игрока в нужную сторону!
+            }
         }
     }
 }

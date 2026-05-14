@@ -12,6 +12,12 @@ public class SaveData
     public bool hasDoubleJump;
     public bool hasDash;
     public bool hasHeavyAttack;
+
+    // Сюжетные предметы
+    public int collectedArtifacts;
+
+    // Карта (Метроидвания)
+    public System.Collections.Generic.List<string> exploredRooms;
 }
 
 public static class SaveSystem
@@ -21,7 +27,7 @@ public static class SaveSystem
         return Application.persistentDataPath + "/game_save.json";
     }
 
-    public static void SaveGame(int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack)
+    public static void SaveGame(int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, int _artifacts, System.Collections.Generic.List<string> _exploredRooms)
     {
         SaveData data = new SaveData
         {
@@ -30,7 +36,9 @@ public static class SaveSystem
             currentLevelIndex = _levelIndex,
             hasDoubleJump = _doubleJump,
             hasDash = _dash,
-            hasHeavyAttack = _heavyAttack
+            hasHeavyAttack = _heavyAttack,
+            collectedArtifacts = _artifacts,
+            exploredRooms = _exploredRooms
         };
 
         string json = JsonUtility.ToJson(data, true);
