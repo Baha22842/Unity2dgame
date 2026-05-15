@@ -41,7 +41,7 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Детекция земли (Ground Check)")]
     public Transform groundCheckPoint;
-    public float groundCheckRadius = 0.2f;
+    public Vector2 groundCheckSize = new Vector2(0.4f, 0.1f); // Тонкая плоская коробка вместо круга
     public LayerMask groundLayer;
 
     [Header("Jump Buffer & Coyote Time")]
@@ -64,6 +64,7 @@ public class PlayerMovement : MonoBehaviour
     private float dashCooldownTimer;
 
     private bool isDead = false;
+    public bool IsDead => isDead;
 
     void Awake()
     {
@@ -95,10 +96,11 @@ public class PlayerMovement : MonoBehaviour
             rb.gravityScale = 0f;
         }
 
-        // Отключаем скрипт атаки, чтобы мертвец не мог махать мечом
+        // Отключаем скрипт атаки и сбрасываем статус атаки, чтобы не сломать анимацию смерти
         PlayerCombat combat = GetComponent<PlayerCombat>();
         if (combat != null)
         {
+            combat.CancelAttack();
             combat.enabled = false;
         }
     }
@@ -155,7 +157,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // --- ПИТЬЕ ЗЕЛЬЯ (Q) ---
-        if (Input.GetKeyDown(KeyCode.Q))
+        if (Input.GetKeyDown(KeyCode.Q) && !isClimbing)
         {
             PlayerAnimator pa = GetComponent<PlayerAnimator>();
             if (pa != null) pa.TriggerDrink();
@@ -176,7 +178,7 @@ public class PlayerMovement : MonoBehaviour
         // --- МЕХАНИКА РЫВКА (DASH) ---
         dashCooldownTimer -= Time.deltaTime;
 
-        if (GameManager.Instance != null && GameManager.Instance.hasDash && Input.GetKeyDown(KeyCode.LeftShift) && dashCooldownTimer <= 0f)
+        if (GameManager.Instance != null && GameManager.Instance.hasDash && Input.GetKeyDown(KeyCode.LeftShift) && dashCooldownTimer <= 0f && !isClimbing)
         {
             isDashing = true;
             dashTimeLeft = dashDuration;
@@ -187,7 +189,8 @@ public class PlayerMovement : MonoBehaviour
         if (isDashing)
         {
             dashTimeLeft -= Time.deltaTime;
-            float dir = GetComponent<SpriteRenderer>().flipX ? -1f : 1f;
+            // Исправление Бага: используем Scale для определения направления рывка!
+            float dir = Mathf.Sign(transform.localScale.x);
             rb.linearVelocity = new Vector2(dir * dashForce, 0f);
 
             if (dashTimeLeft <= 0f)
@@ -222,6 +225,18 @@ public class PlayerMovement : MonoBehaviour
         float moveX = Input.GetAxisRaw("Horizontal");
         float moveY = Input.GetAxisRaw("Vertical");
 
+        // Поворот персонажа (SOLID: отвечает за поворот сам контроллер движений, на основе Input)
+        PlayerCombat combat = GetComponent<PlayerCombat>();
+        bool isAttacking = combat != null && combat.IsAttacking;
+
+        if (!isAttacking && !isDead && !isPushing)
+        {
+            if (moveX > 0.1f)
+                transform.localScale = new Vector3(1, 1, 1);
+            else if (moveX < -0.1f)
+                transform.localScale = new Vector3(-1, 1, 1);
+        }
+
         float currentSpeed = isCrouching ? speed * crouchSpeedMultiplier : speed;
 
         ladderCooldownTimer -= Time.deltaTime;
@@ -254,7 +269,17 @@ public class PlayerMovement : MonoBehaviour
         else
         {
             rb.gravityScale = defaultGravity; // Включаем гравитацию обратно
-            rb.linearVelocity = new Vector2(moveX * currentSpeed, rb.linearVelocity.y);
+            
+            // Если мы атакуем, не переписываем скорость по X, чтобы рывок (Lunge) сработал!
+            if (isAttacking)
+            {
+                // Сохраняем физический импульс от атаки, но позволяем падать
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y);
+            }
+            else
+            {
+                rb.linearVelocity = new Vector2(moveX * currentSpeed, rb.linearVelocity.y);
+            }
         }
 
         // --- МЕХАНИКА ПРЫЖКА (DOUBLE JUMP) ---
@@ -305,8 +330,8 @@ public class PlayerMovement : MonoBehaviour
     {
         if (groundCheckPoint != null)
         {
-            // Проверяем, есть ли под ногами объекты со слоем groundLayer
-            isGrounded = Physics2D.OverlapCircle(groundCheckPoint.position, groundCheckRadius, groundLayer);
+            // Используем OverlapBox вместо OverlapCircle, чтобы стены по бокам не считались землей!
+            isGrounded = Physics2D.OverlapBox(groundCheckPoint.position, groundCheckSize, 0f, groundLayer);
 
             // ХАК ДЛЯ ЛЕСТНИЦ: Если мы лезем по лестнице, игра должна думать, что мы "на земле".
             // Это починит анимацию (будет проигрываться Idle вместо Fall) и позволит нормально прыгать с лестницы!
@@ -322,13 +347,13 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    // Рисуем кружок детекции в редакторе для удобства
+    // Рисуем рамку детекции в редакторе для удобства
     private void OnDrawGizmosSelected()
     {
         if (groundCheckPoint != null)
         {
             Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(groundCheckPoint.position, groundCheckRadius);
+            Gizmos.DrawWireCube(groundCheckPoint.position, groundCheckSize);
         }
     }
 
@@ -353,15 +378,30 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnCollisionStay2D(Collision2D collision)
     {
-        // Нельзя толкать ящик в воздухе ИЛИ сидя (чтобы анимации не конфликтовали)
-        if (isGrounded && !isCrouching && collision.gameObject.CompareTag("Box") && Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.1f)
+        if (collision.gameObject.CompareTag("Box"))
         {
-            isPushing = true;
-            pushTimeBuffer = 0.2f;
-        }
-        else if (collision.gameObject.CompareTag("Box"))
-        {
-            isPushing = false;
+            bool isTouchingSide = false;
+            
+            // Проверяем точки соприкосновения. Нормаль по X означает столкновение сбоку.
+            foreach (ContactPoint2D contact in collision.contacts)
+            {
+                if (Mathf.Abs(contact.normal.x) > 0.5f) // Если поверхность контакта вертикальная (стена ящика)
+                {
+                    isTouchingSide = true;
+                    break;
+                }
+            }
+
+            // Нельзя толкать ящик в воздухе, сидя, ИЛИ стоя прямо на нем
+            if (isGrounded && !isCrouching && isTouchingSide && Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.1f)
+            {
+                isPushing = true;
+                pushTimeBuffer = 0.2f;
+            }
+            else
+            {
+                isPushing = false;
+            }
         }
     }
 

@@ -4,6 +4,10 @@ public class Enemy : MonoBehaviour
 {
     public float speed = 2f;
     public float patrolDistance = 3f;
+    
+    [Header("Здоровье")]
+    public int maxHealth = 3;
+    private int currentHealth;
 
     private Vector3 startPos;
     private int direction = 1;
@@ -12,6 +16,7 @@ public class Enemy : MonoBehaviour
 
     private void Start()
     {
+        currentHealth = maxHealth;
         startPos = transform.position;
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -45,24 +50,43 @@ public class Enemy : MonoBehaviour
         if (!collision.gameObject.CompareTag("Player"))
             return;
 
-        // Если игрок упал сверху — враг умирает
-        if (collision.contacts[0].normal.y < -0.5f)
+        // Любое касание врага наносит урон игроку (убрали прыжок в стиле Марио)
+        PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+        if (pm != null)
         {
-            // Подбросить игрока немного вверх
-            Rigidbody2D playerRb = collision.gameObject.GetComponent<Rigidbody2D>();
-            if (playerRb != null)
-                playerRb.linearVelocity = new Vector2(playerRb.linearVelocity.x, 5f);
+            pm.TakeDamage(transform.position);
+        }
+    }
 
-            Destroy(gameObject);
-        }
-        else
+    /// <summary>
+    /// Получение урона врагом от атак игрока.
+    /// </summary>
+    public void TakeDamage(int damage)
+    {
+        currentHealth -= damage;
+        
+        // Визуальная вспышка при получении урона (эффект мигания красным)
+        if (spriteRenderer != null)
         {
-            // Игрок задел врага сбоку/снизу — получает урон и отбрасывается
-            PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
-            if (pm != null)
-            {
-                pm.TakeDamage(transform.position); // Передаем позицию врага, чтобы отбросить игрока в нужную сторону!
-            }
+            spriteRenderer.color = Color.red;
+            Invoke(nameof(ResetColor), 0.15f);
         }
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    private void ResetColor()
+    {
+        if (spriteRenderer != null)
+            spriteRenderer.color = Color.white;
+    }
+
+    private void Die()
+    {
+        // В будущем здесь можно добавить анимацию смерти или спавн партиклов
+        Destroy(gameObject);
     }
 }

@@ -30,7 +30,7 @@ public class AbilityOrb : MonoBehaviour
             PlayerMovement pm = collider.GetComponent<PlayerMovement>();
             
             if (pa != null) pa.TriggerPowerUp();
-            if (pm != null) pm.FreezeMovement(1.5f);
+            if (pm != null) pm.FreezeMovement(1.0f); // Ровно 1 секунда (по длине анимации)
 
             // Создаем красивый эффект (если он назначен)
             if (pickupEffectPrefab != null)

@@ -56,7 +56,7 @@ Transform:
   m_GameObject: {fileID: 7473656940579560004}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.007, y: -0.644, z: 0}
+  m_LocalPosition: {x: 0.019, y: -0.593, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -196,8 +196,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.008984864, y: -0.016837716}
-  m_Size: {x: 0.4812107, y: 1.2701051}
+  m_Offset: {x: 0.019092321, y: -0.016837716}
+  m_Size: {x: 0.44366872, y: 1.2701051}
   m_Direction: 0
 --- !u!50 &5136286545505946188
 Rigidbody2D:
@@ -247,7 +247,7 @@ MonoBehaviour:
   crouchSpeedMultiplier: 0.5
   invincibilityDuration: 1
   groundCheckPoint: {fileID: 5987472655861989419}
-  groundCheckRadius: 0.3
+  groundCheckSize: {x: 0.4, y: 0.1}
   groundLayer:
     serializedVersion: 2
     m_Bits: 192
@@ -267,12 +267,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCombat
   attackKey: 323
   heavyAttackKey: 107
-  attackDuration: 0.35
+  thrustKey: 108
   attackPoint: {fileID: 1557274252211703590}
   attackRadius: 0.8
   attackLayers:
     serializedVersion: 2
     m_Bits: 64
+  lightAttack1Lunge: 1
+  lightAttack2Lunge: 0
+  heavyAttackLunge: 0
+  thrustAttackLunge: 8
+  light1Duration: 0.25
+  light2Duration: 0.25
+  heavyDuration: 0.3
+  thrustDuration: 0.45
+  comboWindow: 0.5
 --- !u!114 &3113814018255004105
 MonoBehaviour:
   m_ObjectHideFlags: 0

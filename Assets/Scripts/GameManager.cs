@@ -153,9 +153,14 @@ public class GameManager : MonoBehaviour
         Debug.Log("Собран артефакт! Всего: " + collectedArtifacts + " / " + requiredArtifacts);
     }
 
+    private bool isRespawning = false;
+
     public void PlayerDied()
     {
-        StartCoroutine(PlayerDiedRoutine());
+        if (!isRespawning && !IsGameOver)
+        {
+            StartCoroutine(PlayerDiedRoutine());
+        }
     }
 
     public void Heal(int amount = 1)
@@ -172,7 +177,7 @@ public class GameManager : MonoBehaviour
         SaveGameData();
         UpdateHealthUI();
 
-        if (currentHealth <= 0)
+        if (currentHealth <= 0 && !isRespawning && !IsGameOver)
         {
             // Если здоровье упало до 0, запускаем смерть
             StartCoroutine(PlayerDiedRoutine());
@@ -181,6 +186,7 @@ public class GameManager : MonoBehaviour
 
     private System.Collections.IEnumerator PlayerDiedRoutine()
     {
+        isRespawning = true;
         currentHealth--;
         SaveGameData();
         UpdateHealthUI();
@@ -202,6 +208,8 @@ public class GameManager : MonoBehaviour
         foreach (var p in allPlayers)
         {
             p.Die();
+            PlayerAnimator panicAnim = p.GetComponent<PlayerAnimator>();
+            if (panicAnim != null) panicAnim.TriggerDie();
         }
 
         // Ждем 1 секунду, пока проигрывается анимация смерти
@@ -222,6 +230,8 @@ public class GameManager : MonoBehaviour
                 RestartLevel();
             }
         }
+        
+        isRespawning = false;
     }
 
     public void WinLevel()

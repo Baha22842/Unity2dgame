@@ -25,11 +25,16 @@ public class PlayerAnimator : MonoBehaviour
     {
         if (rb == null || playerMovement == null) return;
 
-        // 1. Поворот спрайта (Flip) в зависимости от направления движения
-        if (rb.linearVelocity.x > 0.1f)
-            spriteRenderer.flipX = false;
-        else if (rb.linearVelocity.x < -0.1f)
-            spriteRenderer.flipX = true;
+        if (playerMovement.IsDead)
+        {
+            // Жестко останавливаем анимацию, если она попытается пойти по кругу
+            var stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+            if (stateInfo.normalizedTime >= 0.95f && stateInfo.IsTag("Death"))
+            {
+                anim.speed = 0f;
+            }
+            return; // Мертвые не двигаются и не обновляют параметры
+        }
 
         // 2. Передача параметров в Unity Animator
         anim.SetFloat("VelocityX", Mathf.Abs(rb.linearVelocity.x));
@@ -63,11 +68,32 @@ public class PlayerAnimator : MonoBehaviour
         }
         wasGroundedLastFrame = isGroundedNow;
 
-        // 4. Передача атаки
+        // 5. Передаем статус атаки обратно (нужно для блокировки бега)
         if (playerCombat != null)
         {
             anim.SetBool("IsAttacking", playerCombat.IsAttacking);
         }
+    }
+
+    // Триггеры для комбо-атак
+    public void TriggerAttack1()
+    {
+        anim.SetTrigger("Attack1"); // Твоя старая базовая атака
+    }
+
+    public void TriggerAttack2()
+    {
+        anim.SetTrigger("Attack2"); // Анимация HeavyAttack (как часть комбо)
+    }
+
+    public void TriggerHeavyAttack()
+    {
+        anim.SetTrigger("HeavyAttack"); // Анимация SlashWide (мощный удар на К)
+    }
+
+    public void TriggerThrustAttack()
+    {
+        anim.SetTrigger("ThrustAttack"); // Отдельная колющая атака
     }
 
     public void TriggerDrink()
@@ -82,11 +108,13 @@ public class PlayerAnimator : MonoBehaviour
 
     public void TriggerHit()
     {
+        if (playerMovement != null && playerMovement.IsDead) return;
         anim.SetTrigger("Hit");
     }
 
     public void TriggerDie()
     {
         anim.SetTrigger("Die");
+        anim.SetBool("IsDead", true); // Для страховки
     }
 }
