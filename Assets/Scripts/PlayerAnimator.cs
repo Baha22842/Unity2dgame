@@ -1,66 +1,113 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Animator))]
-[RequireComponent(typeof(SpriteRenderer))]
+[RequireComponent(typeof(Animator), typeof(SpriteRenderer))]
 public class PlayerAnimator : MonoBehaviour
 {
     private Animator anim;
-    private SpriteRenderer spriteRenderer;
     private Rigidbody2D rb;
     private PlayerMovement playerMovement;
     private PlayerCombat playerCombat;
 
     private bool wasGroundedLastFrame;
 
+    // Кэшируем хэши параметров для оптимизации (Unity не любит строки в Update)
+    private readonly int velXHash = Animator.StringToHash("VelocityX");
+    private readonly int velYHash = Animator.StringToHash("VelocityY");
+    private readonly int isGroundedHash = Animator.StringToHash("IsGrounded");
+    private readonly int isClimbingHash = Animator.StringToHash("IsClimbing");
+    private readonly int isDashingHash = Animator.StringToHash("IsDashing");
+    private readonly int isPushingHash = Animator.StringToHash("IsPushing");
+    private readonly int isCrouchingHash = Animator.StringToHash("IsCrouching");
+    private readonly int isRollFallingHash = Animator.StringToHash("IsRollFalling");
+    private readonly int isAttackingHash = Animator.StringToHash("IsAttacking");
+    private readonly int isLedgeGrabbingHash = Animator.StringToHash("IsLedgeGrabbing");
+    private readonly int isPowerUpHash = Animator.StringToHash("IsPowerUp");
+
     private void Awake()
     {
         anim = GetComponent<Animator>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         playerMovement = GetComponent<PlayerMovement>();
         playerCombat = GetComponent<PlayerCombat>();
+    }
+
+    private void OnEnable()
+    {
+        if (playerMovement != null)
+        {
+            playerMovement.OnStateChanged += HandleStateChanged;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (playerMovement != null)
+        {
+            playerMovement.OnStateChanged -= HandleStateChanged;
+        }
+    }
+
+    private void HandleStateChanged(PlayerMovement.PlayerState newState)
+    {
+        // Здесь можно реагировать на смену стейтов напрямую
+        // Например: если newState == PlayerState.Jump, запускаем партиклы
     }
 
     private void Update()
     {
         if (rb == null || playerMovement == null) return;
 
-        if (playerMovement.IsDead)
+        if (playerMovement.IsDead || playerMovement.CurrentState == PlayerMovement.PlayerState.PowerUp)
         {
-            // Жестко останавливаем анимацию, если она попытается пойти по кругу
-            var stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-            if (stateInfo.normalizedTime >= 0.95f && stateInfo.IsTag("Death"))
+            // Сбрасываем все параметры движения, чтобы Unity Animator не пытался
+            // переключиться на бег, падение или дэш поверх смерти/пауэрапа
+            anim.SetFloat(velXHash, 0f);
+            anim.SetBool(isDashingHash, false);
+            anim.SetBool(isClimbingHash, false);
+            anim.SetBool(isGroundedHash, true); // Чтобы не падал в воздухе по анимации
+            anim.SetBool(isAttackingHash, false);
+            anim.SetBool(isLedgeGrabbingHash, false);
+            anim.SetBool(isPowerUpHash, true);
+
+            if (playerMovement.IsDead)
             {
-                anim.speed = 0f;
+                var stateInfo = anim.GetCurrentAnimatorStateInfo(0);
+                if (stateInfo.normalizedTime >= 0.95f && stateInfo.IsTag("Death"))
+                {
+                    anim.speed = 0f; // Замораживаем на последнем кадре
+                }
             }
-            return; // Мертвые не двигаются и не обновляют параметры
+            return; // Полностью блокируем остальную логику
         }
+        
+        anim.SetBool(isPowerUpHash, false);
 
-        // 2. Передача параметров в Unity Animator
-        anim.SetFloat("VelocityX", Mathf.Abs(rb.linearVelocity.x));
-        anim.SetFloat("VelocityY", rb.linearVelocity.y);
-        anim.SetBool("IsGrounded", playerMovement.IsGrounded);
-        anim.SetBool("IsClimbing", playerMovement.IsClimbing);
-        anim.SetBool("IsDashing", playerMovement.IsDashing);
-        anim.SetBool("IsPushing", playerMovement.IsPushing);
-        anim.SetBool("IsCrouching", playerMovement.IsCrouching);
-        anim.SetBool("IsRollFalling", playerMovement.IsRollFalling);
+        // Стабилизация анимации бега у стены
+        float animVelX = Mathf.Abs(rb.linearVelocity.x);
+        if (playerMovement.CurrentState == PlayerMovement.PlayerState.Run) animVelX = 1f;
+        else if (playerMovement.CurrentState == PlayerMovement.PlayerState.Idle) animVelX = 0f;
 
-        // 3. Умная пауза анимации на лестнице
+        anim.SetFloat(velXHash, animVelX);
+        anim.SetFloat(velYHash, rb.linearVelocity.y);
+        anim.SetBool(isGroundedHash, playerMovement.IsGrounded);
+        anim.SetBool(isClimbingHash, playerMovement.IsClimbing);
+        anim.SetBool(isDashingHash, playerMovement.IsDashing);
+        anim.SetBool(isPushingHash, playerMovement.IsPushing);
+        anim.SetBool(isCrouchingHash, playerMovement.IsCrouching);
+        anim.SetBool(isRollFallingHash, playerMovement.IsRollFalling);
+        anim.SetBool(isLedgeGrabbingHash, playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeGrab);
+
+        // Пауза анимации на лестнице
         if (playerMovement.IsClimbing)
         {
-            // Если игрок висит на лестнице и не двигается, ставим анимацию на паузу
-            if (Mathf.Abs(rb.linearVelocity.y) > 0.1f || Mathf.Abs(rb.linearVelocity.x) > 0.1f)
-                anim.speed = 1f;
-            else
-                anim.speed = 0f;
+            anim.speed = (Mathf.Abs(rb.linearVelocity.y) > 0.1f || Mathf.Abs(rb.linearVelocity.x) > 0.1f) ? 1f : 0f;
         }
         else
         {
-            anim.speed = 1f; // Для всех остальных анимаций скорость нормальная
+            anim.speed = 1f;
         }
 
-        // 4. Триггер приземления: срабатывает в МОМЕНТ касания земли, а не пока стоим
+        // Триггер приземления
         bool isGroundedNow = playerMovement.IsGrounded;
         if (isGroundedNow && !wasGroundedLastFrame && rb.linearVelocity.y <= 0f)
         {
@@ -68,53 +115,30 @@ public class PlayerAnimator : MonoBehaviour
         }
         wasGroundedLastFrame = isGroundedNow;
 
-        // 5. Передаем статус атаки обратно (нужно для блокировки бега)
         if (playerCombat != null)
         {
-            anim.SetBool("IsAttacking", playerCombat.IsAttacking);
+            anim.SetBool(isAttackingHash, playerCombat.IsAttacking);
         }
     }
 
-    // Триггеры для комбо-атак
-    public void TriggerAttack1()
+    public void TriggerAttack1() => anim.SetTrigger("Attack1");
+    public void TriggerAttack2() => anim.SetTrigger("Attack2");
+    public void TriggerHeavyAttack() => anim.SetTrigger("HeavyAttack");
+    public void TriggerThrustAttack() => anim.SetTrigger("ThrustAttack");
+    public void TriggerDrink() => anim.SetTrigger("Drink");
+    public void TriggerPowerUp() 
     {
-        anim.SetTrigger("Attack1"); // Твоя старая базовая атака
+        anim.Play("PlayerWomanPowerUp"); // Точное название из скриншота!
     }
-
-    public void TriggerAttack2()
-    {
-        anim.SetTrigger("Attack2"); // Анимация HeavyAttack (как часть комбо)
-    }
-
-    public void TriggerHeavyAttack()
-    {
-        anim.SetTrigger("HeavyAttack"); // Анимация SlashWide (мощный удар на К)
-    }
-
-    public void TriggerThrustAttack()
-    {
-        anim.SetTrigger("ThrustAttack"); // Отдельная колющая атака
-    }
-
-    public void TriggerDrink()
-    {
-        anim.SetTrigger("Drink");
-    }
-
-    public void TriggerPowerUp()
-    {
-        anim.SetTrigger("PowerUp");
-    }
-
     public void TriggerHit()
     {
         if (playerMovement != null && playerMovement.IsDead) return;
         anim.SetTrigger("Hit");
     }
-
     public void TriggerDie()
     {
+        anim.Play("Death"); // Принудительно запускаем стейт смерти поверх всего
         anim.SetTrigger("Die");
-        anim.SetBool("IsDead", true); // Для страховки
+        anim.SetBool("IsDead", true);
     }
 }
