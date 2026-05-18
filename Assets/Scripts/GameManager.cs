@@ -159,6 +159,8 @@ public class GameManager : MonoBehaviour
     {
         if (!isRespawning && !IsGameOver)
         {
+            // Убедимся, что здоровье равно 0, если нас убила ловушка, чтобы не было десинхронизации UI
+            currentHealth = 0;
             StartCoroutine(PlayerDiedRoutine());
         }
     }
@@ -187,7 +189,8 @@ public class GameManager : MonoBehaviour
     private System.Collections.IEnumerator PlayerDiedRoutine()
     {
         isRespawning = true;
-        currentHealth--;
+        // Убираем currentHealth-- здесь, так как мы уже либо получили урон в TakeDamage,
+        // либо насильно сбросили в 0 в PlayerDied (от ловушки). Иначе здоровье уходит в минус.
         SaveGameData();
         UpdateHealthUI();
 

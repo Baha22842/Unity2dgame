@@ -202,6 +202,12 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity = Vector2.zero;
         rb.gravityScale = 0f;
         
+        // Отключаем коллайдер, чтобы враги больше не толкали труп
+        if (playerCollider != null)
+        {
+            playerCollider.enabled = false;
+        }
+
         if (combat != null)
         {
             combat.CancelAttack();
