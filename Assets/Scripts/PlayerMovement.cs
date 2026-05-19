@@ -169,7 +169,7 @@ public class PlayerMovement : MonoBehaviour
         else if (CurrentState == PlayerState.Hit)
         {
             if (anim != null) anim.TriggerHit();
-            FreezeMovement(0.4f);
+            FreezeMovement(0.25f); // Быстрое оглушение как в Hollow Knight
         }
     }
 
@@ -193,7 +193,7 @@ public class PlayerMovement : MonoBehaviour
         }
         
         if (anim != null) anim.TriggerPowerUp();
-        FreezeMovement(3f); // Время проигрывания анимации получения предмета
+        FreezeMovement(0.5f); // Время проигрывания анимации получения предмета (по просьбе - 0.5 сек)
     }
 
     public void Die()
@@ -207,6 +207,8 @@ public class PlayerMovement : MonoBehaviour
             combat.CancelAttack();
             combat.enabled = false;
         }
+
+        if (anim != null) anim.TriggerDie();
     }
 
     public void TakeDamage(Vector2 damageSourcePosition)
@@ -218,7 +220,8 @@ public class PlayerMovement : MonoBehaviour
         float knockbackDir = Mathf.Sign(transform.position.x - damageSourcePosition.x);
         if (knockbackDir == 0) knockbackDir = 1f;
 
-        rb.linearVelocity = new Vector2(knockbackDir * 5f, 5f);
+        // Отбрасывание в стиле Hollow Knight (сильно по горизонтали, но не слишком далеко, чуть-чуть вверх)
+        rb.linearVelocity = new Vector2(knockbackDir * 4f, 1f);
         ChangeState(PlayerState.Hit);
 
         if (GameManager.Instance != null)
@@ -249,8 +252,12 @@ public class PlayerMovement : MonoBehaviour
 
         if (_freezeTimer > 0f)
         {
-            // Being frozen prevents state changes (except death)
-            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            // В состоянии Hit мы сохраняем инерцию откидывания, 
+            // в остальных станах (Смерть, PowerUp, Питье) - жестко стоим на месте
+            if (CurrentState != PlayerState.Hit)
+            {
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            }
             return;
         }
 
@@ -283,12 +290,12 @@ public class PlayerMovement : MonoBehaviour
         if (_dashCooldownTimer > 0f) _dashCooldownTimer -= Time.deltaTime;
         if (_ladderCooldownTimer > 0f) _ladderCooldownTimer -= Time.deltaTime;
 
-        if (_isGrounded || CurrentState == PlayerState.LedgeGrab || CurrentState == PlayerState.LedgeClimb)
+        if (_isGrounded)
         {
             _coyoteTimer = coyoteTime;
             _remainingJumps = (GameManager.Instance != null && GameManager.Instance.hasDoubleJump) ? 1 : 0;
             _isRollFalling = false;
-            _canDashInAir = true; // Сбрасываем рывок при касании земли или стены
+            _canDashInAir = true; // Сбрасываем рывок только при касании земли
         }
         else
         {
@@ -463,13 +470,24 @@ public class PlayerMovement : MonoBehaviour
         if (wallCheck != null && ledgeCheck != null)
         {
             RaycastHit2D wallHit = Physics2D.Raycast(wallCheck.position, Vector2.right * _facingDirection, wallCheckDistance, groundLayer);
-            bool isTouchingLedge = Physics2D.Raycast(ledgeCheck.position, Vector2.right * _facingDirection, wallCheckDistance, groundLayer);
+            
+            // Фикс бага бесконечного лазания по плоской стене:
+            // Обычный Raycast мог провалиться в микро-шов между тайлами (Unity Tilemap баг), 
+            // из-за чего игра думала, что стена закончилась, и начинала LedgeGrab.
+            // CircleCast имеет толщину и не проваливается в швы.
+            RaycastHit2D ledgeHit = Physics2D.CircleCast(ledgeCheck.position, 0.05f, Vector2.right * _facingDirection, wallCheckDistance, groundLayer);
+            bool isTouchingLedge = ledgeHit.collider != null;
 
             if (wallHit.collider != null && !isTouchingLedge && !_isGrounded && rb.linearVelocity.y < 0f && CurrentState != PlayerState.LedgeGrab && CurrentState != PlayerState.LedgeClimb)
             {
-                // Исключаем объекты, за которые нельзя цепляться
-                string t = wallHit.collider.tag;
-                if (t != "Box" && t != "Enemy" && t != "Interactable" && t != "Door" && t != "Lever" && t != "Button")
+                // Архитектурно правильный (Senior) подход:
+                // Вместо того чтобы хардкодить миллион тегов (Враги, Ящики, Боссы),
+                // мы просто проверяем физику объекта. Мы цепляемся только за статические объекты (земля/стены)!
+                Rigidbody2D hitRb = wallHit.collider.attachedRigidbody;
+                bool isStaticTerrain = hitRb == null || hitRb.bodyType == RigidbodyType2D.Static;
+                bool isSolid = !wallHit.collider.isTrigger;
+
+                if (isStaticTerrain && isSolid)
                 {
                     ChangeState(PlayerState.LedgeGrab);
                 }

@@ -1,202 +1,249 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D), typeof(PlayerAnimator), typeof(PlayerMovement))]
 public class PlayerCombat : MonoBehaviour
 {
     [Header("Attack Settings")]
-    public KeyCode attackKey = KeyCode.J;
-    public KeyCode heavyAttackKey = KeyCode.K;
-    public KeyCode thrustKey = KeyCode.L; // Отдельная кнопка для колющей атаки
+    [SerializeField] private KeyCode attackKey = KeyCode.J;
+    [SerializeField] private KeyCode heavyAttackKey = KeyCode.K;
+    [SerializeField] private KeyCode thrustKey = KeyCode.L; 
 
-    public Transform attackPoint;
-    public float attackRadius = 0.5f;
-    [Tooltip("Не забудь добавить слой, на котором находятся Враги и Рычаги!")]
-    public LayerMask attackLayers;
+    [SerializeField] private Transform attackPoint;
+    [SerializeField] private float attackRadius = 0.5f;
+    [SerializeField] private LayerMask attackLayers;
 
-    [Header("Hollow Knight Style Movement")]
-    public float lightAttack1Lunge = 2f; 
-    public float lightAttack2Lunge = 4f; 
-    public float heavyAttackLunge = 10f; // Огромный рывок вперед для SlashWide
-    public float thrustAttackLunge = 8f; // Резкий выпад для колющей
+    [Header("Movement Impulses (Lunge)")]
+    // Рывки вперед для обычных атак полностью удалены по просьбе пользователя
+    [SerializeField] private float thrustAttackLunge = 8f; 
 
-    [Header("Attack Durations (Чтобы анимация успевала)")]
-    public float light1Duration = 0.4f;
-    public float light2Duration = 0.4f;
-    public float heavyDuration = 0.3f; // Изменено на 0.30 по твоей длине анимации!
-    public float thrustDuration = 0.6f; // Чуть дольше, потому что выпад срабатывает с задержкой
+    [Header("Recoil (Hollow Knight Style)")]
+    [SerializeField] private float recoilForceX = 7f; // Сила отскока назад
+    [SerializeField] private float recoilForceY = 10f; // Для будущего Pogo Jump (удара вниз)
 
-    public bool IsAttacking => isAttacking;
+    [Header("Attack Settings")]
+    [SerializeField] private float globalAttackCooldown = 0.5f; // Ограничитель спама (Hollow Knight style)
+    private float _cooldownTimer;
 
-    private bool isAttacking;
-    private float attackTimer;
-    private int queuedAttackType = 0; 
-    
-    // Переменные для отложенного рывка (Wind-up)
-    private float lungeDelayTimer = 0f;
-    private float pendingLungeForce = 0f;
+    [Header("Attack Durations")]
+    [SerializeField] private float light1Duration = 0.4f;
+    [SerializeField] private float light2Duration = 0.4f;
+    [SerializeField] private float heavyDuration = 0.3f; 
+    [SerializeField] private float thrustDuration = 0.6f; 
 
-    // Комбо-система
-    private int comboStep = 0;
-    private float comboResetTimer = 0f;
-    public float comboWindow = 0.6f; // Сколько секунд есть на 2й удар
+    [Header("Combo System")]
+    [SerializeField] private float comboWindow = 0.6f;
+
+    public bool IsAttacking { get; private set; }
+
+    private float _attackTimer;
+    private int _queuedAttackType = 0; 
+    private float _lungeDelayTimer = 0f;
+    private float _pendingLungeForce = 0f;
+    private int _comboStep = 0;
+    private float _comboResetTimer = 0f;
 
     private Rigidbody2D rb;
     private PlayerAnimator pa;
+    private PlayerMovement pm;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         pa = GetComponent<PlayerAnimator>();
+        pm = GetComponent<PlayerMovement>();
     }
 
     private void Update()
     {
-        // Таймер для отложенного рывка (например, колющий удар ждет 0.3 сек)
-        if (lungeDelayTimer > 0f)
+        if (pm.IsDead || pm.CurrentState == PlayerMovement.PlayerState.PowerUp) return;
+
+        UpdateLungeAndCombo();
+
+        if (pm.IsClimbing || pm.CurrentState == PlayerMovement.PlayerState.LedgeGrab || pm.CurrentState == PlayerMovement.PlayerState.LedgeClimb) return; 
+
+        if (_cooldownTimer > 0f)
         {
-            lungeDelayTimer -= Time.deltaTime;
-            if (lungeDelayTimer <= 0f && pendingLungeForce != 0f)
+            _cooldownTimer -= Time.deltaTime;
+        }
+
+        if (IsAttacking)
+        {
+            HandleAttackState();
+            return; 
+        }
+
+        HandleAttackInput();
+    }
+
+    private void UpdateLungeAndCombo()
+    {
+        if (_lungeDelayTimer > 0f)
+        {
+            _lungeDelayTimer -= Time.deltaTime;
+            if (_lungeDelayTimer <= 0f && _pendingLungeForce != 0f)
             {
-                rb.linearVelocity = new Vector2(pendingLungeForce, rb.linearVelocity.y);
-                pendingLungeForce = 0f;
+                rb.linearVelocity = new Vector2(_pendingLungeForce, rb.linearVelocity.y);
+                _pendingLungeForce = 0f;
             }
         }
 
-        // Сброс комбо, если долго не били
-        if (comboResetTimer > 0f && !isAttacking) 
+        if (_comboResetTimer > 0f && !IsAttacking) 
         {
-            comboResetTimer -= Time.deltaTime;
-            if (comboResetTimer <= 0f) comboStep = 0;
+            _comboResetTimer -= Time.deltaTime;
+            if (_comboResetTimer <= 0f) _comboStep = 0;
         }
+    }
 
-        PlayerMovement pm = GetComponent<PlayerMovement>();
-        if (pm != null && pm.IsClimbing) return; // Нельзя бить мечом на лестнице!
-
-        // Если мы УЖЕ бьем, но игрок жмет кнопку еще раз — ставим удар в очередь (Input Buffering)
-        if (isAttacking)
+    private void HandleAttackState()
+    {
+        _attackTimer -= Time.deltaTime;
+        if (_attackTimer <= 0f)
         {
-            if (Input.GetKeyDown(attackKey)) 
-            {
-                queuedAttackType = (comboStep == 0) ? 1 : 2;
-            }
-
-            attackTimer -= Time.deltaTime;
-            if (attackTimer <= 0f)
-            {
-                isAttacking = false;
-                // Если был удар в очереди - запускаем его сразу!
-                if (queuedAttackType != 0)
-                {
-                    int nextAttack = queuedAttackType;
-                    queuedAttackType = 0;
-                    StartAttack(nextAttack);
-                }
-            }
-            return; // Во время удара новые удары с нуля не начинаем
+            IsAttacking = false;
         }
+    }
 
-        // Если мы НЕ бьем, читаем обычные нажатия
+    private void HandleAttackInput()
+    {
+        if (_cooldownTimer > 0f) return; // Блокировка спама
+
         if (Input.GetKeyDown(attackKey))
         {
-            if (comboStep == 0) StartAttack(1); // Старая атака
-            else StartAttack(2); // Анимация HeavyAttack
+            StartAttack(_comboStep == 0 ? 1 : 2);
         }
         else if (Input.GetKeyDown(heavyAttackKey) && GameManager.Instance != null && GameManager.Instance.hasHeavyAttack)
         {
-            StartAttack(3); // SlashWide (в коде это Heavy)
+            StartAttack(3);
         }
         else if (Input.GetKeyDown(thrustKey))
         {
-            StartAttack(4); // Колющая атака (Thrust)
+            StartAttack(4); 
         }
     }
 
     private void StartAttack(int attackType)
     {
-        isAttacking = true;
-        comboResetTimer = comboWindow;
+        IsAttacking = true;
+        _comboResetTimer = comboWindow;
+        _cooldownTimer = globalAttackCooldown; // Устанавливаем кулдаун
 
-        // Позволяем мгновенно развернуться ПЕРЕД самым ударом, если игрок жмет стрелочку
+        // Поворачиваем персонажа ПЕРЕД ударом
         float moveX = Input.GetAxisRaw("Horizontal");
         if (moveX > 0.1f) transform.localScale = new Vector3(1, 1, 1);
         else if (moveX < -0.1f) transform.localScale = new Vector3(-1, 1, 1);
 
-        // Направление теперь берем из Scale
         float facingDir = Mathf.Sign(transform.localScale.x);
         bool isHeavy = (attackType == 3);
 
-        // Распределяем импульсы, анимации и таймеры
-        if (attackType == 1)
-        {
-            attackTimer = light1Duration;
-            if (pa != null) pa.TriggerAttack1();
-            rb.linearVelocity = new Vector2(facingDir * lightAttack1Lunge, rb.linearVelocity.y);
-            comboStep = 1;
-        }
-        else if (attackType == 2)
-        {
-            attackTimer = light2Duration;
-            if (pa != null) pa.TriggerAttack2();
-            rb.linearVelocity = new Vector2(facingDir * lightAttack2Lunge, rb.linearVelocity.y);
-            comboStep = 0;
-        }
-        else if (attackType == 3) // Тяжелая (SlashWide)
-        {
-            attackTimer = heavyDuration;
-            if (pa != null) pa.TriggerHeavyAttack();
-            rb.linearVelocity = new Vector2(facingDir * heavyAttackLunge, rb.linearVelocity.y); // Бьет вперед мгновенно
-            comboStep = 0;
-        }
-        else if (attackType == 4) // Колющая (Thrust)
-        {
-            attackTimer = thrustDuration;
-            if (pa != null) pa.TriggerThrustAttack();
-            // ВМЕСТО мгновенного рывка, ставим задержку 0.30 секунд!
-            lungeDelayTimer = 0.30f;
-            pendingLungeForce = facingDir * thrustAttackLunge; 
-            comboStep = 0;
-        }
+        ApplyAttackEffects(attackType, facingDir);
+        CheckHitboxes(isHeavy);
+    }
 
-        if (attackPoint == null)
-            return;
+    private void ApplyAttackEffects(int attackType, float facingDir)
+    {
+        switch (attackType)
+        {
+            case 1:
+                _attackTimer = light1Duration;
+                if (pa != null) pa.TriggerAttack1();
+                // Рывок вперед удален
+                _comboStep = 1;
+                break;
+            case 2:
+                _attackTimer = light2Duration;
+                if (pa != null) pa.TriggerAttack2();
+                // Рывок вперед удален
+                _comboStep = 0;
+                break;
+            case 3:
+                _attackTimer = heavyDuration;
+                if (pa != null) pa.TriggerHeavyAttack();
+                // Рывок вперед удален
+                _comboStep = 0;
+                break;
+            case 4:
+                _attackTimer = thrustDuration;
+                if (pa != null) pa.TriggerThrustAttack();
+                _lungeDelayTimer = 0.30f;
+                _pendingLungeForce = facingDir * thrustAttackLunge; 
+                _comboStep = 0;
+                break;
+        }
+    }
+
+    private void CheckHitboxes(bool isHeavy)
+    {
+        if (attackPoint == null) return;
 
         Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, attackRadius, attackLayers);
-
         bool hasHitSomething = false;
 
         foreach (Collider2D hit in hits)
         {
-            // 1. Проверяем, враг ли это (обычный)
             Enemy enemy = hit.GetComponentInParent<Enemy>();
             if (enemy != null)
             {
-                int damage = isHeavy ? 2 : 1;
-                enemy.TakeDamage(damage);
+                enemy.TakeDamage(isHeavy ? 2 : 1);
                 hasHitSomething = true;
             }
 
-            // Проверяем, босс ли это
             Boss boss = hit.GetComponentInParent<Boss>();
             if (boss != null)
             {
-                int damage = isHeavy ? 2 : 1; 
-                boss.TakeDamage(damage);
+                boss.TakeDamage(isHeavy ? 2 : 1);
                 hasHitSomething = true;
             }
 
-            // 2. Проверяем, можно ли по этому ударить (например, Рычаг или Стена)
             IHittable hittableObj = hit.GetComponentInParent<IHittable>();
             if (hittableObj != null)
             {
                 hittableObj.OnHit(isHeavy);
                 hasHitSomething = true;
             }
+
+            // Проверка на удар об стену/пол (если слой объекта называется "Ground")
+            if (hit.gameObject.layer == LayerMask.NameToLayer("Ground"))
+            {
+                hasHitSomething = true;
+            }
         }
 
-        // Если мы по чему-то попали, вызываем остановку времени (Hit Stop)
-        if (hasHitSomething && GameManager.Instance != null)
+        if (hasHitSomething)
         {
-            GameManager.Instance.HitStop(0.04f); // Останавливаем время на 0.04 сек для крутого эффекта
+            if (GameManager.Instance != null) GameManager.Instance.HitStop(0.04f);
+            
+            // Отдача (Recoil) как в Hollow Knight
+            ApplyRecoil();
         }
+    }
+
+    private void ApplyRecoil()
+    {
+        float facingDir = Mathf.Sign(transform.localScale.x);
+        
+        // Сбрасываем pending lunge (если был рывок), чтобы отдача была приоритетнее
+        _pendingLungeForce = 0f;
+        _lungeDelayTimer = 0f;
+
+        // Если игрок нажал ВНИЗ в воздухе (Pogo Jump)
+        if (Input.GetAxisRaw("Vertical") < -0.1f && !pm.IsGrounded)
+        {
+            // Подкидываем вверх
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, recoilForceY);
+        }
+        else
+        {
+            // Откидываем назад
+            rb.linearVelocity = new Vector2(-facingDir * recoilForceX, rb.linearVelocity.y);
+        }
+    }
+
+    public void CancelAttack()
+    {
+        IsAttacking = false;
+        _attackTimer = 0f;
+        _lungeDelayTimer = 0f;
+        _pendingLungeForce = 0f;
     }
 
     private void OnDrawGizmosSelected()
@@ -204,13 +251,5 @@ public class PlayerCombat : MonoBehaviour
         if (attackPoint == null) return;
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(attackPoint.position, attackRadius);
-    }
-
-    public void CancelAttack()
-    {
-        isAttacking = false;
-        attackTimer = 0f;
-        lungeDelayTimer = 0f;
-        pendingLungeForce = 0f;
     }
 }

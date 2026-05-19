@@ -55,50 +55,33 @@ public class PlayerAnimator : MonoBehaviour
 
     private void Update()
     {
-        if (rb == null || playerMovement == null) return;
+        if (rb == null || playerMovement == null || anim == null) return;
 
-        if (playerMovement.IsDead || playerMovement.CurrentState == PlayerMovement.PlayerState.PowerUp)
-        {
-            // Сбрасываем все параметры движения, чтобы Unity Animator не пытался
-            // переключиться на бег, падение или дэш поверх смерти/пауэрапа
-            anim.SetFloat(velXHash, 0f);
-            anim.SetBool(isDashingHash, false);
-            anim.SetBool(isClimbingHash, false);
-            anim.SetBool(isGroundedHash, true); // Чтобы не падал в воздухе по анимации
-            anim.SetBool(isAttackingHash, false);
-            anim.SetBool(isLedgeGrabbingHash, false);
-            anim.SetBool(isPowerUpHash, true);
+        bool isDead = playerMovement.IsDead;
+        bool isPowerUp = playerMovement.CurrentState == PlayerMovement.PlayerState.PowerUp;
 
-            if (playerMovement.IsDead)
-            {
-                var stateInfo = anim.GetCurrentAnimatorStateInfo(0);
-                if (stateInfo.normalizedTime >= 0.95f && stateInfo.IsTag("Death"))
-                {
-                    anim.speed = 0f; // Замораживаем на последнем кадре
-                }
-            }
-            return; // Полностью блокируем остальную логику
-        }
-        
-        anim.SetBool(isPowerUpHash, false);
+        // Вместо костылей с "return;" мы просто ставим всем параметрам нужные значения
+        anim.SetBool("IsDead", isDead);
+        anim.SetBool(isPowerUpHash, isPowerUp);
 
         // Стабилизация анимации бега у стены
         float animVelX = Mathf.Abs(rb.linearVelocity.x);
         if (playerMovement.CurrentState == PlayerMovement.PlayerState.Run) animVelX = 1f;
-        else if (playerMovement.CurrentState == PlayerMovement.PlayerState.Idle) animVelX = 0f;
+        else if (playerMovement.CurrentState == PlayerMovement.PlayerState.Idle || isDead || isPowerUp) animVelX = 0f;
 
         anim.SetFloat(velXHash, animVelX);
         anim.SetFloat(velYHash, rb.linearVelocity.y);
-        anim.SetBool(isGroundedHash, playerMovement.IsGrounded);
-        anim.SetBool(isClimbingHash, playerMovement.IsClimbing);
-        anim.SetBool(isDashingHash, playerMovement.IsDashing);
-        anim.SetBool(isPushingHash, playerMovement.IsPushing);
-        anim.SetBool(isCrouchingHash, playerMovement.IsCrouching);
-        anim.SetBool(isRollFallingHash, playerMovement.IsRollFalling);
-        anim.SetBool(isLedgeGrabbingHash, playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeGrab);
+        
+        // Блокируем параметры, когда игрок мертв или берет сферу
+        anim.SetBool(isGroundedHash, (isDead || isPowerUp) ? true : playerMovement.IsGrounded);
+        anim.SetBool(isClimbingHash, !isDead && !isPowerUp && playerMovement.IsClimbing);
+        anim.SetBool(isDashingHash, !isDead && !isPowerUp && playerMovement.IsDashing);
+        anim.SetBool(isPushingHash, !isDead && !isPowerUp && playerMovement.IsPushing);
+        anim.SetBool(isCrouchingHash, !isDead && !isPowerUp && playerMovement.IsCrouching);
+        anim.SetBool(isRollFallingHash, !isDead && !isPowerUp && playerMovement.IsRollFalling);
+        anim.SetBool(isLedgeGrabbingHash, !isDead && !isPowerUp && playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeGrab);
 
-        // Пауза анимации на лестнице
-        if (playerMovement.IsClimbing)
+        if (playerMovement.IsClimbing && !isDead && !isPowerUp)
         {
             anim.speed = (Mathf.Abs(rb.linearVelocity.y) > 0.1f || Mathf.Abs(rb.linearVelocity.x) > 0.1f) ? 1f : 0f;
         }
@@ -107,9 +90,8 @@ public class PlayerAnimator : MonoBehaviour
             anim.speed = 1f;
         }
 
-        // Триггер приземления
         bool isGroundedNow = playerMovement.IsGrounded;
-        if (isGroundedNow && !wasGroundedLastFrame && rb.linearVelocity.y <= 0f)
+        if (isGroundedNow && !wasGroundedLastFrame && rb.linearVelocity.y <= 0f && !isDead && !isPowerUp)
         {
             anim.SetTrigger("JustLanded");
         }
@@ -117,7 +99,7 @@ public class PlayerAnimator : MonoBehaviour
 
         if (playerCombat != null)
         {
-            anim.SetBool(isAttackingHash, playerCombat.IsAttacking);
+            anim.SetBool(isAttackingHash, !isDead && !isPowerUp && playerCombat.IsAttacking);
         }
     }
 
@@ -137,8 +119,6 @@ public class PlayerAnimator : MonoBehaviour
     }
     public void TriggerDie()
     {
-        anim.Play("Death"); // Принудительно запускаем стейт смерти поверх всего
-        anim.SetTrigger("Die");
-        anim.SetBool("IsDead", true);
+        anim.Play("PlayerWomanDying"); // Принудительно запускаем стейт смерти
     }
 }
