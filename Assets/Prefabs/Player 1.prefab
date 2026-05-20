@@ -25,7 +25,69 @@ Transform:
   m_GameObject: {fileID: 331159371042712856}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.7, y: 0.01, z: 0}
+  m_LocalPosition: {x: 0.654, y: 0.01, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1842084823970945774}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2359265565442588961
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4581811220165322641}
+  m_Layer: 0
+  m_Name: LedgeCheck
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4581811220165322641
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2359265565442588961}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.177, y: 0.388, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1842084823970945774}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &4536853252003990675
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7609933416468692385}
+  m_Layer: 0
+  m_Name: WallCheck
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7609933416468692385
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4536853252003990675}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.204, y: 0.104, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -56,7 +118,7 @@ Transform:
   m_GameObject: {fileID: 7473656940579560004}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.019, y: -0.593, z: 0}
+  m_LocalPosition: {x: 0.019, y: -0.627, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -95,12 +157,14 @@ Transform:
   m_GameObject: {fileID: 8953799377486271065}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.7, y: -2.59, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1557274252211703590}
   - {fileID: 5987472655861989419}
+  - {fileID: 7609933416468692385}
+  - {fileID: 4581811220165322641}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &6055545045391909600
@@ -172,7 +236,7 @@ CapsuleCollider2D:
   m_Enabled: 1
   serializedVersion: 3
   m_Density: 1
-  m_Material: {fileID: 6200000, guid: 33b75a5385d20a9438e186bdbda0ed68, type: 2}
+  m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -196,8 +260,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.019092321, y: -0.016837716}
-  m_Size: {x: 0.44366872, y: 1.2701051}
+  m_Offset: {x: 0.027075723, y: -0.053076565}
+  m_Size: {x: 0.41253147, y: 1.1903697}
   m_Direction: 0
 --- !u!50 &5136286545505946188
 Rigidbody2D:
@@ -215,7 +279,7 @@ Rigidbody2D:
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_GravityScale: 1.2
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 6200000, guid: 33b75a5385d20a9438e186bdbda0ed68, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -240,19 +304,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   speed: 5
   jumpForce: 7
-  dashForce: 15
+  jumpBufferTime: 0.15
+  coyoteTime: 0.1
+  dashForce: 10
   dashDuration: 0.2
   dashCooldown: 1
   climbSpeed: 5
+  wallCheck: {fileID: 7609933416468692385}
+  ledgeCheck: {fileID: 4581811220165322641}
+  wallCheckDistance: 0.2
+  autoLedgeClimbDelay: 0.35
+  ledgeClimbDuration: 0.15
+  acceleration: 10
+  deceleration: 15
+  turnSpeed: 25
+  airMultiplier: 0.8
+  jumpCutMultiplier: 0.5
   crouchSpeedMultiplier: 0.5
   invincibilityDuration: 1
   groundCheckPoint: {fileID: 5987472655861989419}
-  groundCheckSize: {x: 0.4, y: 0.1}
+  groundCheckSize: {x: 0.2, y: 0.1}
   groundLayer:
     serializedVersion: 2
     m_Bits: 192
-  jumpBufferTime: 0.15
-  coyoteTime: 0.1
 --- !u!114 &3750053563042630712
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -269,14 +343,14 @@ MonoBehaviour:
   heavyAttackKey: 107
   thrustKey: 108
   attackPoint: {fileID: 1557274252211703590}
-  attackRadius: 0.8
+  attackRadius: 0.5
   attackLayers:
     serializedVersion: 2
-    m_Bits: 64
-  lightAttack1Lunge: 1
-  lightAttack2Lunge: 0
-  heavyAttackLunge: 0
-  thrustAttackLunge: 8
+    m_Bits: 192
+  thrustAttackLunge: 12
+  recoilForceX: 1
+  recoilForceY: 1
+  globalAttackCooldown: 0.5
   light1Duration: 0.25
   light2Duration: 0.25
   heavyDuration: 0.3
