@@ -397,13 +397,25 @@ public class PlayerMovement : MonoBehaviour
 
         // 4. Move (Inertia & Momentum)
         float currentSpeed = CurrentState == PlayerState.Crouch ? speed * crouchSpeedMultiplier : speed;
+        
+        // Во время толкания ящика немного замедляем игрока для ощущения веса ящика (Senior Touch)
+        if (_isPushing)
+        {
+            currentSpeed *= 0.6f;
+        }
+
         float targetSpeed = moveX * currentSpeed;
 
         // Фикс глитча у стены: если впереди стена, не пытаемся идти в неё (предотвращает подпрыгивания капсулы)
+        // Но игнорируем интерактивные ящики (Box), чтобы игрок мог их толкать!
         bool isWallAhead = false;
         if (wallCheck != null)
         {
-            isWallAhead = Physics2D.Raycast(wallCheck.position, Vector2.right * Mathf.Sign(moveX), wallCheckDistance, groundLayer);
+            RaycastHit2D wallHit = Physics2D.Raycast(wallCheck.position, Vector2.right * Mathf.Sign(moveX), wallCheckDistance, groundLayer);
+            if (wallHit.collider != null && !wallHit.collider.CompareTag("Box"))
+            {
+                isWallAhead = true;
+            }
         }
 
         if (!isAttacking)
