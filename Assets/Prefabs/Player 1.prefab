@@ -56,7 +56,7 @@ Transform:
   m_GameObject: {fileID: 2359265565442588961}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.177, y: 0.388, z: 0}
+  m_LocalPosition: {x: 0.177, y: 0.328, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -87,7 +87,7 @@ Transform:
   m_GameObject: {fileID: 4536853252003990675}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.204, y: 0.104, z: 0}
+  m_LocalPosition: {x: 0.204, y: -0.026, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -134,6 +134,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1842084823970945774}
   - component: {fileID: 6055545045391909600}
+  - component: {fileID: 6613336032534058030}
   - component: {fileID: -1570106415047954174}
   - component: {fileID: 5136286545505946188}
   - component: {fileID: 1393253350823255058}
@@ -226,6 +227,52 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+--- !u!61 &6613336032534058030
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8953799377486271065}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 0
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0.020973437, y: -0.5539286}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 0.7291667, y: 1.2916666}
+    newSize: {x: 1, y: 1}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  m_Size: {x: 0.39841115, y: 0.19112289}
+  m_EdgeRadius: 0
 --- !u!70 &-1570106415047954174
 CapsuleCollider2D:
   m_ObjectHideFlags: 0
@@ -260,8 +307,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.027075723, y: -0.053076565}
-  m_Size: {x: 0.41253147, y: 1.1903697}
+  m_Offset: {x: 0.027075723, y: 0.025546297}
+  m_Size: {x: 0.41253147, y: 1.033124}
   m_Direction: 0
 --- !u!50 &5136286545505946188
 Rigidbody2D:
@@ -313,8 +360,12 @@ MonoBehaviour:
   wallCheck: {fileID: 7609933416468692385}
   ledgeCheck: {fileID: 4581811220165322641}
   wallCheckDistance: 0.2
-  autoLedgeClimbDelay: 0.35
-  ledgeClimbDuration: 0.15
+  ledgeClimbDuration: 0.3
+  maxLedgeGrabFallSpeed: 6
+  ledgeGrabCooldown: 0.25
+  ledgeSnapOffsetX: 0.25
+  ledgeSnapOffsetY: 0.35
+  ledgeReleaseHorizontalForce: 2
   acceleration: 10
   deceleration: 15
   turnSpeed: 25
@@ -323,7 +374,7 @@ MonoBehaviour:
   crouchSpeedMultiplier: 0.5
   invincibilityDuration: 1
   groundCheckPoint: {fileID: 5987472655861989419}
-  groundCheckSize: {x: 0.2, y: 0.1}
+  groundCheckSize: {x: 0.4, y: 0.1}
   groundLayer:
     serializedVersion: 2
     m_Bits: 192

@@ -36,8 +36,18 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private Transform wallCheck;
     [SerializeField] private Transform ledgeCheck;
     [SerializeField] private float wallCheckDistance = 0.4f;
-    [SerializeField] private float autoLedgeClimbDelay = 0.1f; // Время зависания перед авто-прыжком
     [SerializeField] private float ledgeClimbDuration = 0.2f; // Время, пока игрок принудительно летит вперед
+    [Tooltip("Максимальная скорость падения, при которой персонаж еще может зацепиться за уступ. Если скорость полета вниз выше этой величины, зацеп не сработает.")]
+    [SerializeField] private float maxLedgeGrabFallSpeed = 6f;
+    [SerializeField] private float ledgeGrabCooldown = 0.25f; // Задержка перед повторным зацепом
+
+    [Header("Ledge Snap Offsets")]
+    [Tooltip("Смещение по горизонтали от центра персонажа до угла уступа.")]
+    [SerializeField] private float ledgeSnapOffsetX = 0.3f;
+    [Tooltip("Смещение по вертикали от центра персонажа до верха уступа.")]
+    [SerializeField] private float ledgeSnapOffsetY = 0.8f;
+    [Tooltip("Сила толчка от стены при спрыгивании с уступа (на кнопку S).")]
+    [SerializeField] private float ledgeReleaseHorizontalForce = 2f;
 
     [Header("Movement Physics (Inertia)")]
     [SerializeField] private float acceleration = 13f;
@@ -74,6 +84,7 @@ public class PlayerMovement : MonoBehaviour
     private float _coyoteTimer;
     private float _ladderCooldownTimer;
     private float _ledgeClimbTimer;
+    private float _ledgeGrabCooldownTimer;
 
     private int _remainingJumps;
     private int _facingDirection = 1;
@@ -149,6 +160,12 @@ public class PlayerMovement : MonoBehaviour
         else if (CurrentState == PlayerState.LedgeGrab)
         {
             rb.gravityScale = defaultGravity;
+            if (newState == PlayerState.Fall)
+            {
+                _ledgeGrabCooldownTimer = ledgeGrabCooldown;
+                // Даем импульс в противоположную сторону от стены, чтобы персонаж не терся о стену
+                rb.linearVelocity = new Vector2(-_facingDirection * ledgeReleaseHorizontalForce, 0f);
+            }
         }
         else if (CurrentState == PlayerState.LedgeClimb)
         {
@@ -179,7 +196,6 @@ public class PlayerMovement : MonoBehaviour
         {
             rb.gravityScale = 0f;
             rb.linearVelocity = Vector2.zero;
-            _ledgeClimbTimer = autoLedgeClimbDelay; // Засекаем время для авто-прыжка
 
             // Рассчитываем конечную позицию подъема сразу при зацепе,
             // чтобы превентивно сжать коллайдер если над платформой низкий потолок
@@ -206,6 +222,7 @@ public class PlayerMovement : MonoBehaviour
                 CrouchCollider();       // Гарантируем сжатый коллайдер
             }
 
+            // Сохраняем исходную горизонтальную скорость (игрок должен сам зажимать кнопку направления, чтобы залететь на уступ)
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce * climbHeightMul);
             _ledgeClimbTimer = ledgeClimbDuration; // Засекаем время полета вперед
         }
@@ -332,6 +349,7 @@ public class PlayerMovement : MonoBehaviour
         if (_freezeTimer > 0f) _freezeTimer -= Time.deltaTime;
         if (_dashCooldownTimer > 0f) _dashCooldownTimer -= Time.deltaTime;
         if (_ladderCooldownTimer > 0f) _ladderCooldownTimer -= Time.deltaTime;
+        if (_ledgeGrabCooldownTimer > 0f) _ledgeGrabCooldownTimer -= Time.deltaTime;
 
         if (_isGrounded)
         {
@@ -356,7 +374,8 @@ public class PlayerMovement : MonoBehaviour
 
         // Flip character logic
         bool isAttacking = combat != null && combat.IsAttacking;
-        if (!isAttacking && !_isPushing)
+        bool canFlip = !isAttacking && !_isPushing && CurrentState != PlayerState.LedgeGrab;
+        if (canFlip)
         {
             if (moveX > 0.1f) { _facingDirection = 1; transform.localScale = new Vector3(1, 1, 1); }
             else if (moveX < -0.1f) { _facingDirection = -1; transform.localScale = new Vector3(-1, 1, 1); }
@@ -365,17 +384,23 @@ public class PlayerMovement : MonoBehaviour
         switch (CurrentState)
         {
             case PlayerState.LedgeGrab:
-                _ledgeClimbTimer -= Time.deltaTime;
-                if (_ledgeClimbTimer <= 0f)
+                // Игрок висит на уступе бесконечно долго.
+                // При нажатии кнопки Прыжка (Jump / Space) он взбирается наверх.
+                if (Input.GetButtonDown("Jump"))
                 {
                     ChangeState(PlayerState.LedgeClimb);
+                }
+                // При нажатии кнопок Вниз/S/Control отпускает уступ и падает.
+                else if (moveY < -0.1f || Input.GetKeyDown(KeyCode.S) || Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+                {
+                    ChangeState(PlayerState.Fall);
                 }
                 break;
 
             case PlayerState.LedgeClimb:
                 _ledgeClimbTimer -= Time.deltaTime;
-                // Принудительно толкаем вперед игнорируя трение
-                rb.linearVelocity = new Vector2(_facingDirection * speed, rb.linearVelocity.y);
+                // Позволяем игроку полностью контролировать направление движения во время прыжка
+                HandleMovementAndJumps(moveX, moveY, isAttacking);
                 if (_ledgeClimbTimer <= 0f)
                 {
                     ChangeState(_isGrounded ? PlayerState.Idle : PlayerState.Fall);
@@ -495,10 +520,15 @@ public class PlayerMovement : MonoBehaviour
             _jumpBufferTimer = 0f;
             _coyoteTimer = 0f;
             if (!_isGrounded) _remainingJumps--;
+
+            if (anim != null)
+            {
+                anim.TriggerJump();
+            }
         }
 
-        // Variable Jump Height (Короткий прыжок)
-        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f)
+        // Variable Jump Height (Короткий прыжок) — блокируется во время взбирания LedgeClimb для фиксированной высоты
+        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f && CurrentState != PlayerState.LedgeClimb)
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpCutMultiplier);
         }
@@ -546,6 +576,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void CheckLedge()
     {
+        if (_ledgeGrabCooldownTimer > 0f) return;
+
         if (wallCheck != null && ledgeCheck != null)
         {
             RaycastHit2D wallHit = Physics2D.Raycast(wallCheck.position, Vector2.right * _facingDirection, wallCheckDistance, groundLayer);
@@ -557,7 +589,7 @@ public class PlayerMovement : MonoBehaviour
             RaycastHit2D ledgeHit = Physics2D.CircleCast(ledgeCheck.position, 0.05f, Vector2.right * _facingDirection, wallCheckDistance, groundLayer);
             bool isTouchingLedge = ledgeHit.collider != null;
 
-            if (wallHit.collider != null && !isTouchingLedge && !_isGrounded && rb.linearVelocity.y < 0f && CurrentState != PlayerState.LedgeGrab && CurrentState != PlayerState.LedgeClimb)
+            if (wallHit.collider != null && !isTouchingLedge && !_isGrounded && rb.linearVelocity.y < 0f && rb.linearVelocity.y >= -maxLedgeGrabFallSpeed && CurrentState != PlayerState.LedgeGrab && CurrentState != PlayerState.LedgeClimb)
             {
                 // Архитектурно правильный (Senior) подход:
                 // Вместо того чтобы хардкодить миллион тегов (Враги, Ящики, Боссы),
@@ -568,6 +600,16 @@ public class PlayerMovement : MonoBehaviour
 
                 if (isStaticTerrain && isSolid)
                 {
+                    // Вычисляем точное положение угла платформы для pixel-perfect прилипания рук
+                    Vector2 raycastOrigin = new Vector2(wallHit.point.x + _facingDirection * 0.05f, ledgeCheck.position.y);
+                    RaycastHit2D ledgeYHit = Physics2D.Raycast(raycastOrigin, Vector2.down, 1.5f, groundLayer);
+                    
+                    float snapX = wallHit.point.x - _facingDirection * ledgeSnapOffsetX;
+                    float snapY = (ledgeYHit.collider != null) ? ledgeYHit.point.y - ledgeSnapOffsetY : ledgeCheck.position.y - ledgeSnapOffsetY;
+                    
+                    transform.position = new Vector3(snapX, snapY, transform.position.z);
+                    rb.linearVelocity = Vector2.zero;
+
                     ChangeState(PlayerState.LedgeGrab);
                 }
             }

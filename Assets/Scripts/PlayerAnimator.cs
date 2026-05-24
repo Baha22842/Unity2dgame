@@ -21,6 +21,7 @@ public class PlayerAnimator : MonoBehaviour
     private readonly int isRollFallingHash = Animator.StringToHash("IsRollFalling");
     private readonly int isAttackingHash = Animator.StringToHash("IsAttacking");
     private readonly int isLedgeGrabbingHash = Animator.StringToHash("IsLedgeGrabbing");
+    private readonly int isLedgeClimbingHash = Animator.StringToHash("IsLedgeClimbing");
     private readonly int isPowerUpHash = Animator.StringToHash("IsPowerUp");
 
     private void Awake()
@@ -80,6 +81,7 @@ public class PlayerAnimator : MonoBehaviour
         anim.SetBool(isCrouchingHash, !isDead && !isPowerUp && playerMovement.IsCrouching);
         anim.SetBool(isRollFallingHash, !isDead && !isPowerUp && playerMovement.IsRollFalling);
         anim.SetBool(isLedgeGrabbingHash, !isDead && !isPowerUp && playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeGrab);
+        anim.SetBool(isLedgeClimbingHash, !isDead && !isPowerUp && playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeClimb);
 
         if (playerMovement.IsClimbing && !isDead && !isPowerUp)
         {
@@ -120,5 +122,12 @@ public class PlayerAnimator : MonoBehaviour
     public void TriggerDie()
     {
         anim.Play("PlayerWomanDying"); // Принудительно запускаем стейт смерти
+    }
+    public void TriggerJump()
+    {
+        if (anim != null)
+        {
+            anim.Play("PlayerWomanJump", 0, 0f); // Принудительно перезапускаем анимацию прыжка с 0 кадра
+        }
     }
 }
