@@ -366,8 +366,8 @@ MonoBehaviour:
   ledgeSnapOffsetX: 0.25
   ledgeSnapOffsetY: 0.35
   ledgeReleaseHorizontalForce: 2
-  acceleration: 10
-  deceleration: 15
+  acceleration: 15
+  deceleration: 20
   turnSpeed: 25
   airMultiplier: 0.8
   jumpCutMultiplier: 0.5
