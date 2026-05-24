@@ -84,6 +84,11 @@ public class PlayerMovement : MonoBehaviour
     private bool _isRollFalling;
     private bool _canDashInAir = true;
 
+    // Ceiling prediction system
+    private Vector2 _climbEndPos;
+    private float _lastCeilingY;
+    private bool _ceilingDetected;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -98,11 +103,24 @@ public class PlayerMovement : MonoBehaviour
             standingColliderSize = playerCollider.size;
             standingColliderOffset = playerCollider.offset;
         }
+
+        // Превентивное обнаружение столкновений — предотвращает прохождение сквозь тонкие платформы/потолки
+        if (rb != null)
+        {
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        }
     }
 
     private void Start()
     {
         ChangeState(PlayerState.Idle);
+
+        // Гарантируем, что на игроке есть скрипт привязки камеры, 
+        // независимо от того, какой префаб (Player или Player 1) выбран в GameManager
+        if (GetComponent<CameraTarget>() == null)
+        {
+            gameObject.AddComponent<CameraTarget>();
+        }
     }
 
     private void ChangeState(PlayerState newState)
@@ -112,7 +130,11 @@ public class PlayerMovement : MonoBehaviour
         // Exit state logic
         if (CurrentState == PlayerState.Crouch)
         {
-            RestoreCollider();
+            // Не восстанавливаем коллайдер, если над головой потолок — иначе застрянем!
+            if (!HasCeilingAbove())
+            {
+                RestoreCollider();
+            }
         }
         else if (CurrentState == PlayerState.Climb)
         {
@@ -158,12 +180,33 @@ public class PlayerMovement : MonoBehaviour
             rb.gravityScale = 0f;
             rb.linearVelocity = Vector2.zero;
             _ledgeClimbTimer = autoLedgeClimbDelay; // Засекаем время для авто-прыжка
+
+            // Рассчитываем конечную позицию подъема сразу при зацепе,
+            // чтобы превентивно сжать коллайдер если над платформой низкий потолок
+            _climbEndPos = (Vector2)transform.position + new Vector2(
+                _facingDirection * wallCheckDistance * 2f,
+                standingColliderSize.y * 0.6f
+            );
+
+            // Проверяем, есть ли потолок над конечной точкой подъема
+            if (HasCeilingAbovePosition(_climbEndPos))
+            {
+                CrouchCollider(); // Превентивно сжимаем коллайдер ещё на висении
+            }
         }
         else if (CurrentState == PlayerState.LedgeClimb)
         {
             rb.gravityScale = defaultGravity;
-            // Делаем импульс вверх
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce * 0.85f);
+
+            // Снижаем высоту траектории подъема если над конечной платформой низкий потолок
+            float climbHeightMul = 0.85f;
+            if (HasCeilingAbovePosition(_climbEndPos))
+            {
+                climbHeightMul = 0.35f; // Плоская траектория под потолком
+                CrouchCollider();       // Гарантируем сжатый коллайдер
+            }
+
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce * climbHeightMul);
             _ledgeClimbTimer = ledgeClimbDuration; // Засекаем время полета вперед
         }
         else if (CurrentState == PlayerState.Hit)
@@ -393,7 +436,7 @@ public class PlayerMovement : MonoBehaviour
         // 3. Crouch
         bool crouchInput = _isGrounded && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl));
         if (crouchInput && CurrentState != PlayerState.Crouch) ChangeState(PlayerState.Crouch);
-        else if (!crouchInput && CurrentState == PlayerState.Crouch) ChangeState(PlayerState.Idle);
+        else if (!crouchInput && CurrentState == PlayerState.Crouch && !HasCeilingAbove()) ChangeState(PlayerState.Idle);
 
         // 4. Move (Inertia & Momentum)
         float currentSpeed = CurrentState == PlayerState.Crouch ? speed * crouchSpeedMultiplier : speed;
@@ -460,6 +503,30 @@ public class PlayerMovement : MonoBehaviour
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpCutMultiplier);
         }
 
+        // 6. Ceiling Bump Prevention — превентивное предотвращение клиппинга головы
+        float ceilingY;
+        if (CheckCeilingPrediction(out ceilingY))
+        {
+            // Сбрасываем вертикальную скорость если летим вверх
+            if (rb.linearVelocity.y > 0f)
+            {
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
+            }
+
+            // Математически ограничиваем Y-позицию — 0% проникновения в потолок!
+            float maxAllowedY = GetMaxAllowedY(ceilingY);
+            if (rb.position.y > maxAllowedY)
+            {
+                rb.position = new Vector2(rb.position.x, maxAllowedY);
+            }
+
+            // Мгновенный приседание (даже в воздухе) — персонаж пригибается от удара об потолок
+            if (CurrentState != PlayerState.Crouch)
+            {
+                ChangeState(PlayerState.Crouch);
+            }
+        }
+
         // State Update
         if (CurrentState != PlayerState.Crouch && CurrentState != PlayerState.Hit && CurrentState != PlayerState.LedgeGrab && CurrentState != PlayerState.LedgeClimb)
         {
@@ -506,6 +573,116 @@ public class PlayerMovement : MonoBehaviour
             }
         }
     }
+
+    // ======================== CEILING PREDICTION SYSTEM ========================
+
+    /// <summary>
+    /// Динамическое предсказание потолка с помощью BoxCast.
+    /// Дистанция луча рассчитывается на основе Time.fixedDeltaTime * 2 для раннего обнаружения
+    /// препятствий на высоких скоростях. Возвращает мировую Y-координату нижней грани потолка.
+    /// </summary>
+    private bool CheckCeilingPrediction(out float ceilingY)
+    {
+        ceilingY = float.MaxValue;
+        if (playerCollider == null) return false;
+
+        // Размер бокса = текущий размер коллайдера (учитывает присед)
+        Vector2 boxSize = playerCollider.size * (Vector2)transform.localScale;
+        boxSize.x *= 0.9f; // Чуть уже, чтобы не цеплять стены по бокам
+
+        // Начальная точка — макушка текущего коллайдера
+        Vector2 boxCenter = (Vector2)transform.position + playerCollider.offset * (Vector2)transform.localScale;
+        float halfHeight = boxSize.y / 2f;
+        Vector2 castOrigin = new Vector2(boxCenter.x, boxCenter.y + halfHeight);
+
+        // Динамическая дистанция: чем быстрее летим, тем дальше смотрим (минимум 0.1 юнита)
+        float predictedDistance = Mathf.Max(
+            Mathf.Abs(rb.linearVelocity.y) * Time.fixedDeltaTime * 2.0f,
+            0.1f
+        );
+
+        // BoxCast вверх от макушки
+        RaycastHit2D[] hits = Physics2D.BoxCastAll(
+            castOrigin,
+            new Vector2(boxSize.x, 0.05f), // Тонкий горизонтальный бокс
+            0f,
+            Vector2.up,
+            predictedDistance,
+            groundLayer
+        );
+
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hit.collider == null || hit.collider.isTrigger) continue;
+            if (hit.collider.gameObject == gameObject) continue; // Игнорируем себя
+
+            // Нижняя грань потолка
+            float hitCeilingY = hit.point.y;
+            if (hitCeilingY < ceilingY)
+            {
+                ceilingY = hitCeilingY;
+            }
+        }
+
+        _ceilingDetected = ceilingY < float.MaxValue;
+        if (_ceilingDetected) _lastCeilingY = ceilingY;
+
+        return _ceilingDetected;
+    }
+
+    /// <summary>
+    /// Рассчитывает максимально допустимую Y-координату rb.position,
+    /// чтобы макушка коллайдера не проникала в потолок.
+    /// </summary>
+    private float GetMaxAllowedY(float ceilingY)
+    {
+        if (playerCollider == null) return ceilingY;
+
+        Vector2 currentSize = playerCollider.size * (Vector2)transform.localScale;
+        Vector2 currentOffset = playerCollider.offset * (Vector2)transform.localScale;
+        float topOfCollider = currentOffset.y + currentSize.y / 2f;
+
+        // maxY = ceilingY - расстояние_от_центра_до_макушки - маленький зазор
+        return ceilingY - topOfCollider - 0.01f;
+    }
+
+    /// <summary>
+    /// Быстрая проверка потолка прямо над головой (используется для предотвращения
+    /// восстановления коллайдера под потолком).
+    /// </summary>
+    private bool HasCeilingAbove()
+    {
+        float dummy;
+        return CheckCeilingPrediction(out dummy);
+    }
+
+    /// <summary>
+    /// Проверяет наличие потолка над указанной позицией (для LedgeGrab/LedgeClimb).
+    /// Использует стоячий размер коллайдера для предсказания.
+    /// </summary>
+    private bool HasCeilingAbovePosition(Vector2 position)
+    {
+        Vector2 boxSize = standingColliderSize * (Vector2)transform.localScale;
+        boxSize.x *= 0.9f;
+
+        Vector2 castOrigin = new Vector2(
+            position.x,
+            position.y + standingColliderOffset.y * transform.localScale.y + boxSize.y / 2f
+        );
+
+        RaycastHit2D hit = Physics2D.BoxCast(
+            castOrigin,
+            new Vector2(boxSize.x, 0.05f),
+            0f,
+            Vector2.up,
+            0.3f, // Короткая дистанция — просто проверяем, есть ли потолок прямо сверху
+            groundLayer
+        );
+
+        return hit.collider != null && !hit.collider.isTrigger;
+    }
+
+    // ======================== COLLIDER MANAGEMENT ========================
 
     private void CrouchCollider()
     {
@@ -576,6 +753,16 @@ public class PlayerMovement : MonoBehaviour
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(wallCheck.position, wallCheck.position + Vector3.right * _facingDirection * wallCheckDistance);
             Gizmos.DrawLine(ledgeCheck.position, ledgeCheck.position + Vector3.right * _facingDirection * wallCheckDistance);
+        }
+
+        // Визуализация ceiling prediction
+        if (_ceilingDetected)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(
+                new Vector3(transform.position.x - 0.5f, _lastCeilingY, 0f),
+                new Vector3(transform.position.x + 0.5f, _lastCeilingY, 0f)
+            );
         }
     }
 }

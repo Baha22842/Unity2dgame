@@ -23,9 +23,9 @@ public class Enemy : MonoBehaviour
     [SerializeField] private float aggroRange = 6f;
     
     [Header("Ground Patrol (Only for PatrolGround)")]
-    [Tooltip("Пустой объект (Дочерний), находящийся впереди и внизу врага")]
+    [Tooltip("Пустой объект (Дочерний), находящийся впереди и внизу врага (УСТАРЕЛО, теперь рассчитывается автоматически!)")]
     [SerializeField] private Transform edgeCheck;
-    [Tooltip("Пустой объект (Дочерний), находящийся перед лицом врага")]
+    [Tooltip("Пустой объект (Дочерний), находящийся перед лицом врага (УСТАРЕЛО, теперь рассчитывается автоматически!)")]
     [SerializeField] private Transform wallCheck;
     [SerializeField] private LayerMask groundLayer;
     [SerializeField] private float checkDistance = 0.5f;
@@ -80,6 +80,13 @@ public class Enemy : MonoBehaviour
 
         // Синхронизируем направление с начальным масштабом
         _facingDirection = (transform.localScale.x >= 0) ? 1 : -1;
+
+        // Задаем скольжение по умолчанию, если есть Rigidbody
+        BoxCollider2D boxCol = GetComponent<BoxCollider2D>();
+        if (boxCol != null && _rb != null && _rb.sharedMaterial != null)
+        {
+            boxCol.sharedMaterial = _rb.sharedMaterial;
+        }
     }
 
     private void Start()
@@ -194,19 +201,12 @@ public class Enemy : MonoBehaviour
         // 2. Обычный патруль
         _rb.linearVelocity = new Vector2(_facingDirection * speed, _rb.linearVelocity.y);
 
-        if (edgeCheck != null && wallCheck != null)
-        {
-            bool isGroundAhead = CheckGroundAhead();
-            bool isWallAhead = CheckWallAhead();
+        bool isGroundAhead = CheckGroundAhead();
+        bool isWallAhead = CheckWallAhead();
 
-            if (!isGroundAhead || isWallAhead)
-            {
-                ChangeState(EnemyState.Idle);
-            }
-        }
-        else
+        if (!isGroundAhead || isWallAhead)
         {
-            Debug.LogWarning("У патрулирующего врага не настроены EdgeCheck или WallCheck!", this);
+            ChangeState(EnemyState.Idle);
         }
     }
 
@@ -247,17 +247,14 @@ public class Enemy : MonoBehaviour
         }
 
         // Проверяем пропасть/стену перед тем как бежать
-        if (edgeCheck != null && wallCheck != null)
-        {
-            bool isGroundAhead = CheckGroundAhead();
-            bool isWallAhead = CheckWallAhead();
+        bool isGroundAhead = CheckGroundAhead();
+        bool isWallAhead = CheckWallAhead();
 
-            if (!isGroundAhead || isWallAhead)
-            {
-                // Враг не самоубийца — стоим у края и ждем
-                _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
-                return;
-            }
+        if (!isGroundAhead || isWallAhead)
+        {
+            // Враг не самоубийца — стоим у края и ждем
+            _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
+            return;
         }
 
         // Бежим к игроку быстрее, чем при патруле
@@ -265,24 +262,70 @@ public class Enemy : MonoBehaviour
     }
 
     // --- Вспомогательные методы для проверки земли и стен ---
+    private Collider2D GetActiveCollider()
+    {
+        // Сначала пытаемся получить BoxCollider2D (наш основной стабильный коллайдер)
+        BoxCollider2D boxCol = GetComponent<BoxCollider2D>();
+        if (boxCol != null && boxCol.enabled) return boxCol;
+
+        // Если его нет или он выключен, ищем любой другой активный неколлайдер-триггер
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        foreach (var col in colliders)
+        {
+            if (col.enabled && !col.isTrigger)
+            {
+                return col;
+            }
+        }
+        return null;
+    }
+
     private bool CheckGroundAhead()
     {
-        if (edgeCheck == null) return true;
-        RaycastHit2D[] groundHits = Physics2D.RaycastAll(edgeCheck.position, Vector2.down, checkDistance, groundLayer);
-        foreach (var hit in groundHits)
+        Collider2D col = GetActiveCollider();
+        if (col == null) return true;
+
+        // Находим реальную нижнюю грань активного коллайдера
+        float bottomY = col.bounds.min.y;
+        float halfWidth = col.bounds.size.x / 2f;
+        
+        // Проверяем точку впереди границы коллайдера голема
+        float checkX = transform.position.x + _facingDirection * (halfWidth + 0.15f);
+        // Запускаем луч чуть выше нижней грани коллайдера (на 0.05f), чтобы он гарантированно попадал по земле
+        Vector2 checkStart = new Vector2(checkX, bottomY + 0.05f);
+        
+        // Проверяем землю на checkDistance + 0.3f вниз для 100% надежности
+        RaycastHit2D[] hits = Physics2D.RaycastAll(checkStart, Vector2.down, checkDistance + 0.3f, groundLayer);
+        foreach (var hit in hits)
         {
-            if (hit.collider != null && hit.collider.gameObject != gameObject) return true;
+            if (hit.collider != null && hit.collider.gameObject != gameObject && !hit.collider.isTrigger)
+            {
+                return true; // Земля есть!
+            }
         }
-        return false;
+        return false; // Край платформы!
     }
 
     private bool CheckWallAhead()
     {
-        if (wallCheck == null) return false;
-        RaycastHit2D[] wallHits = Physics2D.RaycastAll(wallCheck.position, Vector2.right * _facingDirection, checkDistance, groundLayer);
-        foreach (var hit in wallHits)
+        Collider2D col = GetActiveCollider();
+        if (col == null) return false;
+
+        float halfWidth = col.bounds.size.x / 2f;
+        float checkX = transform.position.x + _facingDirection * (halfWidth + 0.15f);
+        
+        // Проверяем на высоте середины коллайдера
+        float middleY = col.bounds.center.y;
+        Vector2 checkStart = new Vector2(checkX, middleY);
+        
+        // Проверяем стену на checkDistance + 0.3f вперед
+        RaycastHit2D[] hits = Physics2D.RaycastAll(checkStart, Vector2.right * _facingDirection, checkDistance + 0.3f, groundLayer);
+        foreach (var hit in hits)
         {
-            if (hit.collider != null && hit.collider.gameObject != gameObject) return true;
+            if (hit.collider != null && hit.collider.gameObject != gameObject && !hit.collider.isTrigger)
+            {
+                return true; // Стена!
+            }
         }
         return false;
     }
@@ -338,7 +381,6 @@ public class Enemy : MonoBehaviour
     {
         if (projectilePrefab == null || firePoint == null) return;
         
-        // В идеале тут нужен Object Pooling (Этап 12), пока используем Instantiate
         GameObject proj = Instantiate(projectilePrefab, firePoint.position, Quaternion.identity);
         
         Rigidbody2D projRb = proj.GetComponent<Rigidbody2D>();
@@ -347,22 +389,18 @@ public class Enemy : MonoBehaviour
             projRb.linearVelocity = new Vector2(direction * 7f, 0f);
         }
         
-        // Простая очистка памяти, если снаряд никуда не врезался
         Destroy(proj, 3f); 
     }
 
     private void Flip()
     {
         _facingDirection *= -1;
-        // Переворачиваем через localScale, чтобы дочерние объекты
-        // (EdgeCheck, WallCheck) тоже переместились на другую сторону!
+        // Переворачиваем через localScale, чтобы дочерние объекты тоже переместились на другую сторону
         Vector3 scale = transform.localScale;
         scale.x = Mathf.Abs(scale.x) * _facingDirection;
         transform.localScale = scale;
     }
 
-    // В Hollow Knight любой враг наносит урон при касании его тела. 
-    // Это и предотвращает возможность стоять на врагах или безопасно проходить сквозь них.
     private void OnCollisionStay2D(Collision2D collision)
     {
         if (_currentState == EnemyState.Dead || _currentState == EnemyState.Hit) return;
@@ -389,7 +427,7 @@ public class Enemy : MonoBehaviour
             PlayerMovement pm = playerCollider.GetComponent<PlayerMovement>();
             if (pm != null)
             {
-                pm.TakeDamage(transform.position); // Если нужно передавать свой урон: GameManager.Instance.TakeDamage(attackDamage)
+                pm.TakeDamage(transform.position);
             }
         }
     }
@@ -418,9 +456,6 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    // Убрали FlashRed, теперь только аниматор
-
-    /// Безопасный вызов анимации: если стейт не найден, ошибки не будет
     private void PlayAnim(string stateName)
     {
         if (_animator == null || string.IsNullOrEmpty(stateName)) return;
@@ -432,15 +467,37 @@ public class Enemy : MonoBehaviour
         _rb.linearVelocity = Vector2.zero;
         _rb.gravityScale = 0f;
         _rb.bodyType = RigidbodyType2D.Kinematic; // Труп не должен скользить
-        GetComponent<Collider2D>().enabled = false;
         
-        // Проигрываем анимацию смерти
+        // Отключаем абсолютно все коллайдеры при смерти врага
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        foreach (var col in colliders)
+        {
+            col.enabled = false;
+        }
+        
+        // Задаем параметры аниматора для предотвращения ложных переходов
+        if (_animator != null)
+        {
+            _animator.SetBool("IsDead", true);
+            _animator.ResetTrigger("Hit");
+            _animator.ResetTrigger("Attack");
+        }
+        
         PlayAnim(ANIM_DEATH);
         
-        // Тут можно спавнить монетки, ключи или эффект смерти (Пул объектов)
-        // Instantiate(deathParticle, transform.position, Quaternion.identity);
+        // Замораживаем аниматор перед уничтожением объекта
+        StartCoroutine(DisableAnimatorDelayed(1.1f));
         
         Destroy(gameObject, 1.5f); // Даём анимации смерти время доиграться
+    }
+
+    private IEnumerator DisableAnimatorDelayed(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (_animator != null)
+        {
+            _animator.enabled = false;
+        }
     }
 
     private void OnDrawGizmosSelected()
@@ -453,8 +510,17 @@ public class Enemy : MonoBehaviour
         else if (enemyType == EnemyType.PatrolGround)
         {
             Gizmos.color = Color.red;
-            if (edgeCheck != null) Gizmos.DrawLine(edgeCheck.position, edgeCheck.position + Vector3.down * checkDistance);
-            if (wallCheck != null) Gizmos.DrawLine(wallCheck.position, wallCheck.position + Vector3.right * _facingDirection * checkDistance);
+            
+            // Рисуем математический луч проверки земли
+            Collider2D col = GetActiveCollider();
+            if (col != null)
+            {
+                float bottomY = col.bounds.min.y;
+                float halfWidth = col.bounds.size.x / 2f;
+                float checkX = transform.position.x + _facingDirection * (halfWidth + 0.15f);
+                Vector2 checkStart = new Vector2(checkX, bottomY + 0.05f);
+                Gizmos.DrawLine(checkStart, checkStart + Vector2.down * (checkDistance + 0.3f));
+            }
             
             // Рисуем зону агрессии (жёлтый)
             Gizmos.color = Color.yellow;
@@ -462,11 +528,9 @@ public class Enemy : MonoBehaviour
 
             if (meleeAttackPoint != null)
             {
-                // Рисуем хитбокс атаки (маджента)
                 Gizmos.color = Color.magenta;
                 Gizmos.DrawWireCube(meleeAttackPoint.position, meleeAttackSize);
 
-                // Рисуем радиус обнаружения для атаки (голубой)
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawWireCube(meleeAttackPoint.position + (Vector3)(Vector2.right * _facingDirection * attackRange), meleeAttackSize);
                 Gizmos.DrawLine(meleeAttackPoint.position, meleeAttackPoint.position + (Vector3)(Vector2.right * _facingDirection * attackRange));
@@ -478,4 +542,15 @@ public class Enemy : MonoBehaviour
             Gizmos.DrawWireSphere(transform.position, attackRange);
         }
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (speed < 0) speed = 0;
+        if (aggroRange < 0) aggroRange = 0;
+        if (firePoint == null) firePoint = transform.Find("FirePoint");
+        if (meleeAttackPoint == null) meleeAttackPoint = transform.Find("AttackPoint");
+    }
+#endif
 }
+

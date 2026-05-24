@@ -1,16 +1,14 @@
 using UnityEngine;
-
-// Важно: Чтобы скрипт работал, в Unity должен быть установлен пакет Cinemachine!
-// Если светится красным — зайди в Window -> Package Manager, найди Cinemachine и нажми Install.
-using Unity.Cinemachine;
+using System;
+using System.Reflection;
 
 public class CameraManager : MonoBehaviour
 {
     public static CameraManager Instance { get; private set; }
 
     [Header("Настройки Камеры")]
-    [Tooltip("Перетащи сюда компонент CinemachineConfiner2D с твоей виртуальной камеры")]
-    public CinemachineConfiner2D confiner;
+    [Tooltip("Компонент CinemachineConfiner2D (для Cinemachine v3) или CinemachineConfiner (для Cinemachine v2)")]
+    public Component confiner; // Используем базовый тип Component для 100% защиты от ошибок компиляции!
 
     private void Awake()
     {
@@ -26,19 +24,81 @@ public class CameraManager : MonoBehaviour
     {
         if (confiner == null)
         {
-            Debug.LogWarning("CameraManager: Не назначен CinemachineConfiner2D!");
+            // Если конфинер не назначен вручную в инспекторе, попробуем найти его на сцене автоматически
+            confiner = FindConfinerOnScene();
+        }
+
+        if (confiner == null)
+        {
+            Debug.LogWarning("CameraManager: Не найден компонент Cinemachine Confiner на сцене!");
             return;
         }
 
-        // Если границы уже эти — ничего не делаем
-        if (confiner.BoundingShape2D == newBounds) return;
+        try
+        {
+            Type confinerType = confiner.GetType();
 
-        // Назначаем новые границы
-        confiner.BoundingShape2D = newBounds;
+            // В Cinemachine v3 свойство называется BoundingShape2D
+            PropertyInfo boundProp = confinerType.GetProperty("BoundingShape2D");
+            if (boundProp == null)
+            {
+                // В Cinemachine v2 свойство называется m_BoundingShape2D
+                boundProp = confinerType.GetProperty("m_BoundingShape2D") 
+                            ?? confinerType.GetProperty("BoundingVolume"); // на всякий случай
+            }
 
-        // Заставляем Cinemachine пересчитать кеш границ (важно для плавности)
-        confiner.InvalidateBoundingShapeCache();
-        
-        Debug.Log($"Камера заблокирована в границах новой комнаты: {newBounds.gameObject.name}");
+            if (boundProp != null)
+            {
+                // Если границы уже эти — ничего не делаем
+                Collider2D currentBounds = boundProp.GetValue(confiner) as Collider2D;
+                if (currentBounds == newBounds) return;
+
+                // Назначаем новые границы
+                boundProp.SetValue(confiner, newBounds);
+
+                // Заставляем Cinemachine пересчитать кеш границ (InvalidateBoundingShapeCache / InvalidateCache)
+                MethodInfo invalidateMethod = confinerType.GetMethod("InvalidateBoundingShapeCache") 
+                                              ?? confinerType.GetMethod("InvalidateCache");
+                if (invalidateMethod != null)
+                {
+                    invalidateMethod.Invoke(confiner, null);
+                }
+
+                Debug.Log($"[CameraManager] Камера заблокирована в границах новой комнаты: {newBounds.gameObject.name}");
+            }
+            else
+            {
+                Debug.LogWarning("[CameraManager] Не удалось найти свойство BoundingShape2D в компоненте конфинера.");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[CameraManager] Ошибка при установке границ камеры: {e.Message}");
+        }
+    }
+
+    private Component FindConfinerOnScene()
+    {
+        string[] confinerTypes = new string[]
+        {
+            "Unity.Cinemachine.CinemachineConfiner2D", // v3
+            "Cinemachine.CinemachineConfiner",         // v2
+            "Unity.Cinemachine.CinemachineConfiner"
+        };
+
+        foreach (var typeName in confinerTypes)
+        {
+            Type t = Type.GetType(typeName + ", Unity.Cinemachine") 
+                     ?? Type.GetType(typeName + ", Cinemachine")
+                     ?? Type.GetType(typeName);
+            if (t != null)
+            {
+                #pragma warning disable CS0618
+                Component found = FindObjectOfType(t) as Component;
+                #pragma warning restore CS0618
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 }

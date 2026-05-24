@@ -36,6 +36,17 @@ public class GameManager : MonoBehaviour
     [Header("UI")]
     public Text scoreText;
     public GameObject[] healthPoints; // Массив квадратиков здоровья (вместо текста)
+    
+    [Header("Heart Animation Settings")]
+    [Tooltip("Название триггера в Аниматоре сердца, который запускает анимацию его убавления/исчезновения")]
+    [SerializeField] private string heartBreakTrigger = "Hurt";
+    [Tooltip("Название триггера в Аниматоре сердца для возвращения в полное состояние")]
+    [SerializeField] private string heartResetTrigger = "Reset";
+    [Tooltip("Время задержки в секундах перед отключением GameObject сердца (SetActive(false)), чтобы анимация успела проиграться")]
+    [SerializeField] private float heartDisableDelay = 0.5f;
+
+    private Coroutine[] _heartCoroutines;
+
     public GameObject winPanel;
     public GameObject losePanel;
 
@@ -66,6 +77,11 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (healthPoints != null)
+        {
+            _heartCoroutines = new Coroutine[healthPoints.Length];
+        }
 
         if (winPanel != null)
         {
@@ -317,21 +333,155 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private int _visualHealth = -1; // Текущее визуально отображаемое здоровье в интерфейсе
+    private Coroutine _healthAnimationCoroutine;
+
     private void UpdateHealthUI()
     {
         if (healthPoints == null) return;
 
-        // Включаем квадратики в зависимости от currentHealth
+        // Если это первый запуск (или после смерти/загрузки), мгновенно выставляем нужное здоровье без каскадной задержки
+        if (_visualHealth == -1)
+        {
+            _visualHealth = currentHealth;
+            InstantUpdateHealthUI();
+            return;
+        }
+
+        // Если визуальное здоровье не совпадает с реальным, запускаем красивый каскадный переход по одному сердцу
+        if (_visualHealth != currentHealth)
+        {
+            if (_healthAnimationCoroutine != null)
+            {
+                StopCoroutine(_healthAnimationCoroutine);
+            }
+            _healthAnimationCoroutine = StartCoroutine(AnimateHealthChangeRoutine(_visualHealth, currentHealth));
+        }
+    }
+
+    private void InstantUpdateHealthUI()
+    {
         for (int i = 0; i < healthPoints.Length; i++)
         {
-            if (i < currentHealth)
+            if (healthPoints[i] == null) continue;
+            Animator anim = healthPoints[i].GetComponent<Animator>();
+
+            if (i < _visualHealth)
             {
-                healthPoints[i].SetActive(true); // Квадратик красный/активный
+                // Сердце должно быть полным
+                if (_heartCoroutines != null && i < _heartCoroutines.Length && _heartCoroutines[i] != null)
+                {
+                    StopCoroutine(_heartCoroutines[i]);
+                    _heartCoroutines[i] = null;
+                }
+
+                healthPoints[i].SetActive(true);
+
+                if (anim != null)
+                {
+                    if (!string.IsNullOrEmpty(heartResetTrigger)) anim.SetTrigger(heartResetTrigger);
+                    if (!string.IsNullOrEmpty(heartBreakTrigger)) anim.ResetTrigger(heartBreakTrigger);
+                }
             }
             else
             {
-                healthPoints[i].SetActive(false); // Квадратик пропал
+                // Сердце должно быть скрыто
+                healthPoints[i].SetActive(false);
             }
+        }
+    }
+
+    private System.Collections.IEnumerator AnimateHealthChangeRoutine(int fromHealth, int toHealth)
+    {
+        float cascadeDelay = 0.15f; // Время задержки между анимациями соседних сердечек (для каскадного эффекта)
+
+        if (toHealth < fromHealth)
+        {
+            // УБАВЛЕНИЕ (Урон) -> Убавляем СПРАВА НАЛЕВО (от большего индекса к меньшему)
+            for (int i = fromHealth - 1; i >= toHealth; i--)
+            {
+                if (i >= 0 && i < healthPoints.Length && healthPoints[i] != null)
+                {
+                    Animator anim = healthPoints[i].GetComponent<Animator>();
+
+                    if (healthPoints[i].activeSelf)
+                    {
+                        if (anim != null)
+                        {
+                            // Запускаем анимацию разбивания сердца
+                            if (!string.IsNullOrEmpty(heartBreakTrigger))
+                            {
+                                anim.SetTrigger(heartBreakTrigger);
+                            }
+
+                            // Выключаем объект с задержкой, чтобы анимация успела проиграться
+                            if (_heartCoroutines != null && i < _heartCoroutines.Length)
+                            {
+                                if (_heartCoroutines[i] != null) StopCoroutine(_heartCoroutines[i]);
+                                _heartCoroutines[i] = StartCoroutine(DisableHeartDelayed(healthPoints[i], i, heartDisableDelay));
+                            }
+                        }
+                        else
+                        {
+                            healthPoints[i].SetActive(false);
+                        }
+                    }
+
+                    _visualHealth = i;
+                    yield return new WaitForSeconds(cascadeDelay);
+                }
+            }
+        }
+        else
+        {
+            // ВОССТАНОВЛЕНИЕ (Лечение/Возрождение) -> Добавляем СЛЕВА НАПРАВО (от меньшего индекса к большему)
+            for (int i = fromHealth; i < toHealth; i++)
+            {
+                if (i >= 0 && i < healthPoints.Length && healthPoints[i] != null)
+                {
+                    Animator anim = healthPoints[i].GetComponent<Animator>();
+
+                    if (_heartCoroutines != null && i < _heartCoroutines.Length && _heartCoroutines[i] != null)
+                    {
+                        StopCoroutine(_heartCoroutines[i]);
+                        _heartCoroutines[i] = null;
+                    }
+
+                    healthPoints[i].SetActive(true);
+
+                    if (anim != null)
+                    {
+                        // Запускаем анимацию сборки сердца
+                        if (!string.IsNullOrEmpty(heartResetTrigger))
+                        {
+                            anim.SetTrigger(heartResetTrigger);
+                        }
+                        if (!string.IsNullOrEmpty(heartBreakTrigger))
+                        {
+                            anim.ResetTrigger(heartBreakTrigger);
+                        }
+                    }
+
+                    _visualHealth = i + 1;
+                    yield return new WaitForSeconds(cascadeDelay);
+                }
+            }
+        }
+
+        _visualHealth = toHealth;
+        _healthAnimationCoroutine = null;
+    }
+
+    private System.Collections.IEnumerator DisableHeartDelayed(GameObject heart, int index, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (heart != null && index >= currentHealth)
+        {
+            heart.SetActive(false);
+        }
+        if (_heartCoroutines != null && index < _heartCoroutines.Length)
+        {
+            _heartCoroutines[index] = null;
         }
     }
 

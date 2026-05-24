@@ -92,7 +92,21 @@ public class Boss : MonoBehaviour
         // Вместо SpriteRenderer.flipX используем transform.localScale, 
         // чтобы дочерние объекты (например, attackPoint) тоже поворачивались!
         Vector3 scale = transform.localScale;
-        scale.x = Mathf.Abs(scale.x) * (dirX > 0 ? -1f : 1f); // У босса может быть инвертирован скейл в зависимости от арта
+        
+        // Определяем направление флипа в зависимости от того, Голем это или Слизень
+        float flipMultiplier = 1f;
+        if (IsGolem())
+        {
+            // Голем по умолчанию смотрит вправо, поэтому при движении вправо (dirX > 0) масштаб X должен быть положительным
+            flipMultiplier = (dirX > 0 ? 1f : -1f);
+        }
+        else
+        {
+            // Слизень по умолчанию смотрит влево, поэтому при движении вправо (dirX > 0) масштаб X должен быть отрицательным
+            flipMultiplier = (dirX > 0 ? -1f : 1f);
+        }
+        
+        scale.x = Mathf.Abs(scale.x) * flipMultiplier;
         transform.localScale = scale;
         
         if (_rb != null)
@@ -182,9 +196,20 @@ public class Boss : MonoBehaviour
             _rb.linearVelocity = Vector2.zero;
             _rb.gravityScale = 0f; 
         }
-        GetComponent<Collider2D>().enabled = false;
+        
+        // Отключаем абсолютно все коллайдеры босса при смерти
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        foreach (var col in colliders)
+        {
+            col.enabled = false;
+        }
 
-        if (_anim != null) _anim.SetBool("IsDead", true);
+        if (_anim != null)
+        {
+            _anim.SetBool("IsDead", true);
+            _anim.ResetTrigger("Hit");
+            _anim.ResetTrigger("Attack");
+        }
         
         if (portalPrefab != null)
         {
@@ -192,22 +217,54 @@ public class Boss : MonoBehaviour
             Instantiate(portalPrefab, spawnPos, Quaternion.identity);
         }
 
+        // Замораживаем аниматор перед уничтожением объекта
+        StartCoroutine(DisableAnimatorDelayed(1.2f));
+
         Destroy(gameObject, 1.3f);
     }
 
-    private void OnDrawGizmosSelected()
+    private IEnumerator DisableAnimatorDelayed(float delay)
     {
-        if (attackPoint != null)
+        yield return new WaitForSeconds(delay);
+        if (_anim != null)
         {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireCube(attackPoint.position, attackSize);
+            _anim.enabled = false;
+        }
+    }
+
+    public bool IsGolem()
+    {
+        if (gameObject.name.ToLower().Contains("golem") || gameObject.name.ToLower().Contains("golum"))
+            return true;
+
+        if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+        if (_spriteRenderer != null && _spriteRenderer.sprite != null)
+        {
+            string spriteName = _spriteRenderer.sprite.name.ToLower();
+            if (spriteName.Contains("golem") || spriteName.Contains("golum"))
+                return true;
         }
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, aggroRange);
+        if (_anim == null) _anim = GetComponent<Animator>();
+        if (_anim != null && _anim.runtimeAnimatorController != null)
+        {
+            string controllerName = _anim.runtimeAnimatorController.name.ToLower();
+            if (controllerName.Contains("golem") || controllerName.Contains("golum"))
+                return true;
 
-        Gizmos.color = Color.cyan;
-        Vector2 center = Application.isPlaying ? _startPosition : (Vector2)transform.position;
-        Gizmos.DrawWireSphere(center, tetherRange);
+            foreach (var clip in _anim.runtimeAnimatorController.animationClips)
+            {
+                if (clip.name.ToLower().Contains("golem") || clip.name.ToLower().Contains("golum"))
+                    return true;
+            }
+        }
+
+        return false;
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+    }
+#endif
 }
