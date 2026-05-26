@@ -36,7 +36,6 @@ public class PlayerCombat : MonoBehaviour
     public bool IsAttacking { get; private set; }
 
     private float _attackTimer;
-    private int _queuedAttackType = 0; 
     private float _lungeDelayTimer = 0f;
     private float _pendingLungeForce = 0f;
     private int _comboStep = 0;

@@ -8,12 +8,13 @@ public class GameManager : MonoBehaviour
 
     public static void ResetProgress()
     {
-        SaveSystem.DeleteSave();
+        SaveSystem.DeleteSave(SaveSystem.SelectedSlot);
         if (Instance != null)
         {
             Instance.score = 0;
             Instance.currentHealth = Instance.maxHealth;
             Instance.collectedArtifacts = 0;
+            Instance.totalPlayTime = 0f;
             Instance.SaveGameData();
         }
     }
@@ -26,7 +27,7 @@ public class GameManager : MonoBehaviour
     public void SaveGameData()
     {
         // Мы сохраняем currentHealth в параметр lives, чтобы не ломать SaveSystem
-        SaveSystem.SaveGame(score, currentHealth, UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack, collectedArtifacts, exploredRooms);
+        SaveSystem.SaveGame(SaveSystem.SelectedSlot, score, currentHealth, UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack, collectedArtifacts, exploredRooms, totalPlayTime);
     }
 
     [Header("Player")]
@@ -64,6 +65,7 @@ public class GameManager : MonoBehaviour
     private int score;
     private int currentHealth;
     private GameObject currentPlayer;
+    private float totalPlayTime = 0f;
 
     public int Score => score;
     public bool IsGameOver { get; private set; }
@@ -93,7 +95,7 @@ public class GameManager : MonoBehaviour
         }
 
         // Загружаем данные с жесткого диска вместо статических переменных
-        SaveData data = SaveSystem.LoadGame();
+        SaveData data = SaveSystem.LoadGame(SaveSystem.SelectedSlot);
         if (data != null)
         {
             score = data.score;
@@ -106,6 +108,7 @@ public class GameManager : MonoBehaviour
 
             collectedArtifacts = data.collectedArtifacts;
             exploredRooms = data.exploredRooms != null ? data.exploredRooms : new System.Collections.Generic.List<string>();
+            totalPlayTime = data.totalPlayTime;
         }
         else
         {
@@ -116,6 +119,7 @@ public class GameManager : MonoBehaviour
             hasHeavyAttack = false;
             collectedArtifacts = 0;
             exploredRooms = new System.Collections.Generic.List<string>();
+            totalPlayTime = 0f;
             SaveGameData();
         }
 
@@ -126,6 +130,14 @@ public class GameManager : MonoBehaviour
         if (playerSpawnPoint != null && playerPrefab != null)
         {
             SpawnPlayer();
+        }
+    }
+
+    private void Update()
+    {
+        if (!IsGameOver && Time.timeScale > 0f)
+        {
+            totalPlayTime += Time.deltaTime;
         }
     }
 

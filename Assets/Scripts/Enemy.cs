@@ -10,7 +10,6 @@ public class Enemy : MonoBehaviour
     [Header("Base Settings")]
     [SerializeField] private EnemyType enemyType = EnemyType.PatrolGround;
     [SerializeField] private int maxHealth = 3;
-    [SerializeField] private int attackDamage = 1;
 
     [Header("Knockback Settings")]
     [SerializeField] private Vector2 knockbackForce = new Vector2(2f, 2f);

@@ -18,16 +18,21 @@ public class SaveData
 
     // Карта (Метроидвания)
     public System.Collections.Generic.List<string> exploredRooms;
+
+    // Время в игре
+    public float totalPlayTime;
 }
 
 public static class SaveSystem
 {
-    private static string GetSavePath()
+    public static int SelectedSlot = 1;
+
+    private static string GetSavePath(int slotIndex)
     {
-        return Application.persistentDataPath + "/game_save.json";
+        return Application.persistentDataPath + "/game_save_slot_" + slotIndex + ".json";
     }
 
-    public static void SaveGame(int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, int _artifacts, System.Collections.Generic.List<string> _exploredRooms)
+    public static void SaveGame(int slotIndex, int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, int _artifacts, System.Collections.Generic.List<string> _exploredRooms, float _totalPlayTime)
     {
         SaveData data = new SaveData
         {
@@ -38,37 +43,44 @@ public static class SaveSystem
             hasDash = _dash,
             hasHeavyAttack = _heavyAttack,
             collectedArtifacts = _artifacts,
-            exploredRooms = _exploredRooms
+            exploredRooms = _exploredRooms,
+            totalPlayTime = _totalPlayTime
         };
 
         string json = JsonUtility.ToJson(data, true);
-        File.WriteAllText(GetSavePath(), json);
-        Debug.Log("Прогресс сохранен в: " + GetSavePath());
+        File.WriteAllText(GetSavePath(slotIndex), json);
+        Debug.Log("Прогресс сохранен в слот " + slotIndex + ": " + GetSavePath(slotIndex));
     }
 
-    public static SaveData LoadGame()
+    public static SaveData LoadGame(int slotIndex)
     {
-        string path = GetSavePath();
+        string path = GetSavePath(slotIndex);
         if (File.Exists(path))
         {
             string json = File.ReadAllText(path);
             SaveData data = JsonUtility.FromJson<SaveData>(json);
-            Debug.Log("Прогресс загружен!");
+            Debug.Log("Прогресс загружен из слота " + slotIndex + "!");
             return data;
         }
         else
         {
-            Debug.LogWarning("Файл сохранения не найден.");
-            return null; // Возвращаем пустоту, если сохранений еще нет
+            Debug.LogWarning("Файл сохранения в слоте " + slotIndex + " не найден.");
+            return null; 
         }
     }
 
-    public static void DeleteSave()
+    public static bool SaveExists(int slotIndex)
     {
-        string path = GetSavePath();
+        return File.Exists(GetSavePath(slotIndex));
+    }
+
+    public static void DeleteSave(int slotIndex)
+    {
+        string path = GetSavePath(slotIndex);
         if (File.Exists(path))
         {
             File.Delete(path);
+            Debug.Log("Сохранение в слоте " + slotIndex + " удалено.");
         }
     }
 }
