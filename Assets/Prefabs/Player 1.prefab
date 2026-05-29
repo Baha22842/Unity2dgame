@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 331159371042712856}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.654, y: 0.01, z: 0}
+  m_LocalPosition: {x: 0.809, y: 0.01, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -353,9 +353,9 @@ MonoBehaviour:
   jumpForce: 7
   jumpBufferTime: 0.15
   coyoteTime: 0.1
-  dashForce: 10
+  dashForce: 16
   dashDuration: 0.2
-  dashCooldown: 1
+  dashCooldown: 0.5
   climbSpeed: 5
   wallCheck: {fileID: 7609933416468692385}
   ledgeCheck: {fileID: 4581811220165322641}
@@ -394,11 +394,11 @@ MonoBehaviour:
   heavyAttackKey: 107
   thrustKey: 108
   attackPoint: {fileID: 1557274252211703590}
-  attackRadius: 0.5
+  attackRadius: 1
   attackLayers:
     serializedVersion: 2
     m_Bits: 64
-  thrustAttackLunge: 12
+  thrustAttackLunge: 7
   recoilForceX: 1
   recoilForceY: 1
   globalAttackCooldown: 0.5
@@ -406,7 +406,10 @@ MonoBehaviour:
   light2Duration: 0.25
   heavyDuration: 0.3
   thrustDuration: 0.45
-  comboWindow: 0.5
+  comboWindow: 0.4
+  thrustCooldown: 0.8
+  thrustLungeDelay: 0.25
+  thrustLungeDuration: 0.15
 --- !u!114 &3113814018255004105
 MonoBehaviour:
   m_ObjectHideFlags: 0

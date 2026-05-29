@@ -28,16 +28,22 @@ public class PlayerCombat : MonoBehaviour
     [SerializeField] private float light1Duration = 0.4f;
     [SerializeField] private float light2Duration = 0.4f;
     [SerializeField] private float heavyDuration = 0.3f; 
-    [SerializeField] private float thrustDuration = 0.6f; 
+    [SerializeField] private float thrustDuration = 0.5f; 
 
     [Header("Combo System")]
     [SerializeField] private float comboWindow = 0.6f;
 
     public bool IsAttacking { get; private set; }
+    public bool IsThrustActive { get; private set; }
+
+    [SerializeField] private float thrustCooldown = 0.8f; // Небольшая задержка перед следующим выпадом
+    private float _thrustCooldownTimer;
+
+    [Header("Thrust Lunge Timing")]
+    [SerializeField] private float thrustLungeDelay = 0.3f; // Время до начала рывка (замах на 0.3 сек)
+    [SerializeField] private float thrustLungeDuration = 0.1f; // Длительность рывка
 
     private float _attackTimer;
-    private float _lungeDelayTimer = 0f;
-    private float _pendingLungeForce = 0f;
     private int _comboStep = 0;
     private float _comboResetTimer = 0f;
 
@@ -65,6 +71,11 @@ public class PlayerCombat : MonoBehaviour
             _cooldownTimer -= Time.deltaTime;
         }
 
+        if (_thrustCooldownTimer > 0f)
+        {
+            _thrustCooldownTimer -= Time.deltaTime;
+        }
+
         if (IsAttacking)
         {
             HandleAttackState();
@@ -76,13 +87,31 @@ public class PlayerCombat : MonoBehaviour
 
     private void UpdateLungeAndCombo()
     {
-        if (_lungeDelayTimer > 0f)
+        if (IsThrustActive && IsAttacking)
         {
-            _lungeDelayTimer -= Time.deltaTime;
-            if (_lungeDelayTimer <= 0f && _pendingLungeForce != 0f)
+            float elapsed = thrustDuration - _attackTimer;
+            float facingDir = Mathf.Sign(transform.localScale.x);
+
+            if (elapsed >= thrustLungeDelay && elapsed < (thrustLungeDelay + thrustLungeDuration))
             {
-                rb.linearVelocity = new Vector2(_pendingLungeForce, rb.linearVelocity.y);
-                _pendingLungeForce = 0f;
+                // Активная фаза рывка
+                float lungeSpeed = facingDir * thrustAttackLunge;
+                
+                // Проверяем наличие стены
+                RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.right * facingDir, 1.0f, LayerMask.GetMask("Ground"));
+                if (hit.collider == null)
+                {
+                    rb.linearVelocity = new Vector2(lungeSpeed, rb.linearVelocity.y);
+                }
+                else
+                {
+                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                }
+            }
+            else
+            {
+                // Фаза подготовки или восстановления (тормозим)
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
             }
         }
 
@@ -99,11 +128,13 @@ public class PlayerCombat : MonoBehaviour
         if (_attackTimer <= 0f)
         {
             IsAttacking = false;
+            IsThrustActive = false;
         }
     }
 
     private void HandleAttackInput()
     {
+        if (pm.IsCrouching) return; // Запрещаем атаковать в приседе
         if (_cooldownTimer > 0f) return; // Блокировка спама
 
         if (Input.GetKeyDown(attackKey))
@@ -114,7 +145,7 @@ public class PlayerCombat : MonoBehaviour
         {
             StartAttack(3);
         }
-        else if (Input.GetKeyDown(thrustKey))
+        else if (Input.GetKeyDown(thrustKey) && _thrustCooldownTimer <= 0f)
         {
             StartAttack(4); 
         }
@@ -125,6 +156,11 @@ public class PlayerCombat : MonoBehaviour
         IsAttacking = true;
         _comboResetTimer = comboWindow;
         _cooldownTimer = globalAttackCooldown; // Устанавливаем кулдаун
+
+        if (attackType == 4)
+        {
+            _thrustCooldownTimer = thrustCooldown; // Запуск кулдауна выпада
+        }
 
         // Поворачиваем персонажа ПЕРЕД ударом
         float moveX = Input.GetAxisRaw("Horizontal");
@@ -140,6 +176,7 @@ public class PlayerCombat : MonoBehaviour
 
     private void ApplyAttackEffects(int attackType, float facingDir)
     {
+        IsThrustActive = false; // Сброс по умолчанию для всех атак
         switch (attackType)
         {
             case 1:
@@ -163,9 +200,8 @@ public class PlayerCombat : MonoBehaviour
             case 4:
                 _attackTimer = thrustDuration;
                 if (pa != null) pa.TriggerThrustAttack();
-                _lungeDelayTimer = 0.30f;
-                _pendingLungeForce = facingDir * thrustAttackLunge; 
                 _comboStep = 0;
+                IsThrustActive = true;
                 break;
         }
     }
@@ -179,6 +215,20 @@ public class PlayerCombat : MonoBehaviour
 
         foreach (Collider2D hit in hits)
         {
+            // Если у объекта (самого коллайдера или его родителя) есть дочерний HurtBox,
+            // мы должны наносить урон только при попадании по этому HurtBox!
+            Transform targetObj = hit.transform;
+            Transform hurtBox = targetObj.Find("HurtBox");
+            if (hurtBox == null && targetObj.parent != null)
+            {
+                hurtBox = targetObj.parent.Find("HurtBox");
+            }
+
+            if (hurtBox != null && hit.transform != hurtBox)
+            {
+                continue; // Пропускаем удар, так как у цели есть HurtBox, но удар пришелся не по нему!
+            }
+
             Enemy enemy = hit.GetComponentInParent<Enemy>();
             if (enemy != null)
             {
@@ -211,19 +261,19 @@ public class PlayerCombat : MonoBehaviour
         {
             if (GameManager.Instance != null) GameManager.Instance.HitStop(0.04f);
             
-            // Отдача (Recoil) как в Hollow Knight
-            ApplyRecoil();
+            // Отдача (Recoil) только для обычных и тяжелых атак (НЕ для выпада/lunge!)
+            // Это полностью устраняет физический сбой (втискивание капсулы в тайлы под воздействием отдачи)
+            if (!IsThrustActive)
+            {
+                ApplyRecoil();
+            }
         }
     }
 
     private void ApplyRecoil()
     {
         float facingDir = Mathf.Sign(transform.localScale.x);
-        
-        // Сбрасываем pending lunge (если был рывок), чтобы отдача была приоритетнее
-        _pendingLungeForce = 0f;
-        _lungeDelayTimer = 0f;
-
+ 
         // Если игрок нажал ВНИЗ в воздухе (Pogo Jump)
         if (Input.GetAxisRaw("Vertical") < -0.1f && !pm.IsGrounded)
         {
@@ -241,8 +291,7 @@ public class PlayerCombat : MonoBehaviour
     {
         IsAttacking = false;
         _attackTimer = 0f;
-        _lungeDelayTimer = 0f;
-        _pendingLungeForce = 0f;
+        IsThrustActive = false;
     }
 
     private void OnDrawGizmosSelected()

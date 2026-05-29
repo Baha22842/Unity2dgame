@@ -134,6 +134,9 @@ public class Boss : MonoBehaviour
     {
         if (_isDead) return;
 
+        // Игнорируем контактный урон через HurtBox
+        if (collision.otherCollider != null && collision.otherCollider.gameObject.name == "HurtBox") return;
+
         if (collision.gameObject.CompareTag("Player"))
         {
             PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();

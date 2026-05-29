@@ -23,6 +23,7 @@ public class PlayerAnimator : MonoBehaviour
     private readonly int isLedgeGrabbingHash = Animator.StringToHash("IsLedgeGrabbing");
     private readonly int isLedgeClimbingHash = Animator.StringToHash("IsLedgeClimbing");
     private readonly int isPowerUpHash = Animator.StringToHash("IsPowerUp");
+    private readonly int isShieldingHash = Animator.StringToHash("IsShielding");
 
     private void Awake()
     {
@@ -78,10 +79,65 @@ public class PlayerAnimator : MonoBehaviour
         anim.SetBool(isClimbingHash, !isDead && !isPowerUp && playerMovement.IsClimbing);
         anim.SetBool(isDashingHash, !isDead && !isPowerUp && playerMovement.IsDashing);
         anim.SetBool(isPushingHash, !isDead && !isPowerUp && playerMovement.IsPushing);
-        anim.SetBool(isCrouchingHash, !isDead && !isPowerUp && playerMovement.IsCrouching);
+        // Фикс зависания/залипания в crouch walk при отпускании Ctrl на бегу/защите:
+        // Если игрок отжал приседание, но аниматор остался в состояниях приседа, принудительно переключаем его в Idle/Shield
+        if (!isDead && !isPowerUp && !playerMovement.IsCrouching)
+        {
+            var state = anim.GetCurrentAnimatorStateInfo(0);
+            if (state.IsName("PlayerWomanCrouchWalk") || 
+                state.IsName("PlayerWomanCrouchWalkShield") || 
+                state.IsName("PlayerWomanCrouchShieldIdle"))
+            {
+                anim.Play(playerMovement.IsShielding ? "PlayerWomanShieldUp" : "PlayerWomanIdle");
+            }
+        }
+
+        // Управление состояниями щита (ПКМ) в стойке и в приседе (покой/ходьба):
+        if (!isDead && !isPowerUp && playerMovement.IsShielding)
+        {
+            var state = anim.GetCurrentAnimatorStateInfo(0);
+            if (playerMovement.IsCrouching)
+            {
+                if (animVelX > 0.1f)
+                {
+                    if (!state.IsName("PlayerWomanCrouchWalkShield"))
+                    {
+                        anim.Play("PlayerWomanCrouchWalkShield");
+                    }
+                }
+                else
+                {
+                    if (!state.IsName("PlayerWomanCrouchShieldIdle"))
+                    {
+                        anim.Play("PlayerWomanCrouchShieldIdle");
+                    }
+                }
+            }
+            else
+            {
+                if (!state.IsName("PlayerWomanShieldUp"))
+                {
+                    anim.Play("PlayerWomanShieldUp");
+                }
+            }
+        }
+
+        bool isCrouchingParam = !isDead && !isPowerUp && playerMovement.IsCrouching;
+
+        // Фикс глитча/петли Any State -> PlayerWomanCrouch:
+        // Если мы уже идем в приседе (CrouchWalk),
+        // временно сбрасываем IsCrouching в false в аниматоре, чтобы Any State переход не перезапускал анимацию на 1-й кадр.
+        var currentState = anim.GetCurrentAnimatorStateInfo(0);
+        if (isCrouchingParam && currentState.IsName("PlayerWomanCrouchWalk"))
+        {
+            isCrouchingParam = false;
+        }
+
+        anim.SetBool(isCrouchingHash, isCrouchingParam);
         anim.SetBool(isRollFallingHash, !isDead && !isPowerUp && playerMovement.IsRollFalling);
         anim.SetBool(isLedgeGrabbingHash, !isDead && !isPowerUp && playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeGrab);
         anim.SetBool(isLedgeClimbingHash, !isDead && !isPowerUp && playerMovement.CurrentState == PlayerMovement.PlayerState.LedgeClimb);
+        anim.SetBool(isShieldingHash, !isDead && !isPowerUp && playerMovement.IsShielding);
 
         if (playerMovement.IsClimbing && !isDead && !isPowerUp)
         {
@@ -110,6 +166,7 @@ public class PlayerAnimator : MonoBehaviour
     public void TriggerHeavyAttack() => anim.SetTrigger("HeavyAttack");
     public void TriggerThrustAttack() => anim.SetTrigger("ThrustAttack");
     public void TriggerDrink() => anim.SetTrigger("Drink");
+    public void SetTrigger(string triggerName) => anim.SetTrigger(triggerName);
     public void TriggerPowerUp() 
     {
         anim.Play("PlayerWomanPowerUp"); // Точное название из скриншота!

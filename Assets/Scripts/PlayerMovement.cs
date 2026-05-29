@@ -16,6 +16,7 @@ public class PlayerMovement : MonoBehaviour
     public bool IsDead => CurrentState == PlayerState.Dead;
     public bool IsPushing => _isPushing;
     public bool IsRollFalling => _isRollFalling;
+    public bool IsShielding => Input.GetMouseButton(1) && _isGrounded && CurrentState != PlayerState.Dead && CurrentState != PlayerState.PowerUp && CurrentState != PlayerState.Hit;
 
     // Events for better architecture
     public event Action<PlayerState> OnStateChanged;
@@ -29,7 +30,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Dash")]
     [SerializeField] private float dashForce = 15f;
     [SerializeField] private float dashDuration = 0.2f;
-    [SerializeField] private float dashCooldown = 1f;
+    [SerializeField] private float dashCooldown = 0.45f;
 
     [Header("Climbing & Ledges")]
     [SerializeField] private float climbSpeed = 5f;
@@ -50,10 +51,10 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float ledgeReleaseHorizontalForce = 2f;
 
     [Header("Movement Physics (Inertia)")]
-    [SerializeField] private float acceleration = 13f;
-    [SerializeField] private float deceleration = 16f;
-    [SerializeField] private float turnSpeed = 25f;
-    [SerializeField] private float airMultiplier = 0.8f;
+    [SerializeField] private float acceleration = 55f;
+    [SerializeField] private float deceleration = 75f;
+    [SerializeField] private float turnSpeed = 90f;
+    [SerializeField] private float airMultiplier = 0.85f;
     [SerializeField] private float jumpCutMultiplier = 0.5f;
 
     [Header("Crouch")]
@@ -274,6 +275,21 @@ public class PlayerMovement : MonoBehaviour
     public void TakeDamage(Vector2 damageSourcePosition)
     {
         if (_invincibilityTimer > 0f || CurrentState == PlayerState.Dead) return;
+        if (combat != null && combat.IsThrustActive) return; // Не получаем урон во время выпада (lunge/thrust attack)
+
+        // Обработка успешного блока щитом (ПКМ)
+        if (IsShielding)
+        {
+            float dirToSource = Mathf.Sign(damageSourcePosition.x - transform.position.x);
+            if (dirToSource == _facingDirection)
+            {
+                Debug.Log("[PlayerMovement] Удар успешно заблокирован щитом!");
+                rb.linearVelocity = new Vector2(-_facingDirection * 3f, rb.linearVelocity.y); // Легкий отскок назад от силы удара
+                if (anim != null) anim.SetTrigger("Block"); // Анимационный триггер блокирования (искры/звук)
+                _invincibilityTimer = 0.2f; // Кратковременное бессмертие после успешного блока
+                return; // Урон НЕ наносится!
+            }
+        }
         
         _invincibilityTimer = invincibilityDuration;
 
@@ -459,9 +475,17 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // 3. Crouch
-        bool crouchInput = _isGrounded && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl));
-        if (crouchInput && CurrentState != PlayerState.Crouch) ChangeState(PlayerState.Crouch);
-        else if (!crouchInput && CurrentState == PlayerState.Crouch && !HasCeilingAbove()) ChangeState(PlayerState.Idle);
+        bool isHoldingCrouch = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+        bool crouchInput = _isGrounded && isHoldingCrouch;
+        
+        if (crouchInput && CurrentState != PlayerState.Crouch) 
+        {
+            ChangeState(PlayerState.Crouch);
+        }
+        else if (!isHoldingCrouch && CurrentState == PlayerState.Crouch && !HasCeilingAbove()) 
+        {
+            ChangeState(PlayerState.Idle);
+        }
 
         // 4. Move (Inertia & Momentum)
         float currentSpeed = CurrentState == PlayerState.Crouch ? speed * crouchSpeedMultiplier : speed;
@@ -470,6 +494,12 @@ public class PlayerMovement : MonoBehaviour
         if (_isPushing)
         {
             currentSpeed *= 0.6f;
+        }
+
+        // При зажатом щите игрок ходит медленно и защищается
+        if (IsShielding)
+        {
+            currentSpeed *= 0.35f;
         }
 
         float targetSpeed = moveX * currentSpeed;
@@ -533,27 +563,26 @@ public class PlayerMovement : MonoBehaviour
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpCutMultiplier);
         }
 
-        // 6. Ceiling Bump Prevention — превентивное предотвращение клиппинга головы
-        float ceilingY;
-        if (CheckCeilingPrediction(out ceilingY))
+        // 6. Ceiling Bump Prevention — превентивное предотвращение клиппинга головы (только при полете вверх!)
+        if (rb.linearVelocity.y > 0.01f)
         {
-            // Сбрасываем вертикальную скорость если летим вверх
-            if (rb.linearVelocity.y > 0f)
+            float ceilingY;
+            if (CheckCeilingPrediction(out ceilingY))
             {
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
-            }
 
-            // Математически ограничиваем Y-позицию — 0% проникновения в потолок!
-            float maxAllowedY = GetMaxAllowedY(ceilingY);
-            if (rb.position.y > maxAllowedY)
-            {
-                rb.position = new Vector2(rb.position.x, maxAllowedY);
-            }
+                // Математически ограничиваем Y-позицию — 0% проникновения в потолок!
+                float maxAllowedY = GetMaxAllowedY(ceilingY);
+                if (rb.position.y > maxAllowedY)
+                {
+                    rb.position = new Vector2(rb.position.x, maxAllowedY);
+                }
 
-            // Мгновенный приседание (даже в воздухе) — персонаж пригибается от удара об потолок
-            if (CurrentState != PlayerState.Crouch)
-            {
-                ChangeState(PlayerState.Crouch);
+                // Мгновенный приседание (даже в воздухе) — персонаж пригибается от удара об потолок
+                if (CurrentState != PlayerState.Crouch)
+                {
+                    ChangeState(PlayerState.Crouch);
+                }
             }
         }
 
