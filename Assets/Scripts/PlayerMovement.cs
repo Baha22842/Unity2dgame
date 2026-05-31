@@ -24,6 +24,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Movement Stats")]
     [SerializeField] private float speed = 5f;
     [SerializeField] private float jumpForce = 7f;
+    [SerializeField] private float doubleJumpForce = 5f;
     [SerializeField] private float jumpBufferTime = 0.15f;
     [SerializeField] private float coyoteTime = 0.1f;
 
@@ -95,6 +96,7 @@ public class PlayerMovement : MonoBehaviour
     private bool _isPushing;
     private bool _isRollFalling;
     private bool _canDashInAir = true;
+    private bool _isDoubleJumping = false;
 
     // Ceiling prediction system
     private Vector2 _climbEndPos;
@@ -343,12 +345,16 @@ public class PlayerMovement : MonoBehaviour
             ChangeState(_isGrounded ? PlayerState.Idle : PlayerState.Fall);
         }
 
-        if (Input.GetKeyDown(KeyCode.Q) && CurrentState != PlayerState.Climb)
+        if (Input.GetKeyDown(KeyCode.Q) && CurrentState != PlayerState.Climb && CurrentState != PlayerState.Dead && CurrentState != PlayerState.PowerUp && CurrentState != PlayerState.Drink && CurrentState != PlayerState.Hit)
         {
-            ChangeState(PlayerState.Drink);
-            if (anim != null) anim.TriggerDrink();
-            FreezeMovement(1.5f);
-            return;
+            if (GameManager.Instance != null && GameManager.Instance.potionsCount > 0 && GameManager.Instance.CurrentHealth < GameManager.Instance.maxHealth)
+            {
+                ChangeState(PlayerState.Drink);
+                if (anim != null) anim.TriggerDrink();
+                FreezeMovement(1.5f);
+                GameManager.Instance.UsePotion();
+                return;
+            }
         }
         
         if (CurrentState == PlayerState.Drink && _freezeTimer <= 0f)
@@ -373,6 +379,7 @@ public class PlayerMovement : MonoBehaviour
             _remainingJumps = (GameManager.Instance != null && GameManager.Instance.hasDoubleJump) ? 1 : 0;
             _isRollFalling = false;
             _canDashInAir = true; // Сбрасываем рывок только при касании земли
+            _isDoubleJumping = false;
         }
         else
         {
@@ -546,10 +553,26 @@ public class PlayerMovement : MonoBehaviour
         // 5. Jump
         if (_jumpBufferTimer > 0f && (_coyoteTimer > 0f || (!_isGrounded && _remainingJumps > 0)))
         {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            _jumpBufferTimer = 0f;
+            // Если у нас активно Coyote Time (персонаж только что сошел с края платформы),
+            // этот прыжок считается полноценным первым прыжком с земли, а не двойным!
+            bool wasCoyoteJump = (_coyoteTimer > 0f);
             _coyoteTimer = 0f;
-            if (!_isGrounded) _remainingJumps--;
+
+            if (!wasCoyoteJump && !_isGrounded)
+            {
+                // Это второй (двойной) прыжок
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, doubleJumpForce);
+                _isDoubleJumping = true; // Активируем флаг фиксированного прыжка
+                _remainingJumps--;
+            }
+            else
+            {
+                // Это первый прыжок с земли
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+                _isDoubleJumping = false;
+            }
+
+            _jumpBufferTimer = 0f;
 
             if (anim != null)
             {
@@ -557,8 +580,8 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        // Variable Jump Height (Короткий прыжок) — блокируется во время взбирания LedgeClimb для фиксированной высоты
-        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f && CurrentState != PlayerState.LedgeClimb)
+        // Variable Jump Height (Короткий прыжок) — блокируется для LedgeClimb и двойного прыжка (делая его фиксированным)
+        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f && CurrentState != PlayerState.LedgeClimb && !_isDoubleJumping)
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpCutMultiplier);
         }
@@ -598,7 +621,12 @@ public class PlayerMovement : MonoBehaviour
     {
         if (groundCheckPoint != null)
         {
-            _isGrounded = Physics2D.OverlapBox(groundCheckPoint.position, groundCheckSize, 0f, groundLayer);
+            // Сужаем ширину зоны проверки приземления до 60% от исходной,
+            // чтобы она физически не могла пересекаться с вертикальными стенами при прижимании вплотную.
+            Vector2 narrowedCheckSize = new Vector2(groundCheckSize.x * 0.6f, groundCheckSize.y);
+
+            _isGrounded = Physics2D.OverlapBox(groundCheckPoint.position, narrowedCheckSize, 0f, groundLayer);
+            
             if (CurrentState == PlayerState.Climb) _isGrounded = true; // Ladder hack
         }
     }
@@ -719,12 +747,41 @@ public class PlayerMovement : MonoBehaviour
 
     /// <summary>
     /// Быстрая проверка потолка прямо над головой (используется для предотвращения
-    /// восстановления коллайдера под потолком).
+    /// восстановления коллайдера под потолком при попытке встать из приседа).
     /// </summary>
     private bool HasCeilingAbove()
     {
-        float dummy;
-        return CheckCeilingPrediction(out dummy);
+        if (playerCollider == null) return false;
+
+        // Вычисляем мировую Y-координату макушки текущего (присевшего) коллайдера
+        float currentTopY = transform.position.y + playerCollider.offset.y * transform.localScale.y + (playerCollider.size.y * transform.localScale.y) / 2f;
+
+        // Вычисляем мировую Y-координату макушки стоячего коллайдера, если бы игрок выпрямился
+        float standingTopY = transform.position.y + standingColliderOffset.y * transform.localScale.y + (standingColliderSize.y * transform.localScale.y) / 2f;
+
+        // Разница в высоте, на которую вырастет коллайдер при выпрямлении
+        float heightDifference = standingTopY - currentTopY;
+
+        if (heightDifference <= 0.01f) return false; // Защита: разница ничтожно мала или мы уже стоим
+
+        // Сужаем ширину проверки на 10%, чтобы не цеплять боковые стены при разворотах
+        float boxWidth = standingColliderSize.x * Mathf.Abs(transform.localScale.x) * 0.9f;
+        Vector2 boxSize = new Vector2(boxWidth, 0.05f);
+        
+        // Начинаем проверку чуть выше текущей макушки, чтобы не задеть собственный коллайдер
+        Vector2 castOrigin = new Vector2(transform.position.x, currentTopY + 0.02f);
+
+        // Стреляем тонкой коробкой вверх на высоту, которую займет голова стоячего персонажа (+ небольшой запас)
+        RaycastHit2D hit = Physics2D.BoxCast(
+            castOrigin,
+            boxSize,
+            0f,
+            Vector2.up,
+            heightDifference - 0.02f + 0.1f, // С запасом в 0.1 юнита для надежности
+            groundLayer
+        );
+
+        return hit.collider != null;
     }
 
     /// <summary>

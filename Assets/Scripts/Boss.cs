@@ -2,11 +2,19 @@ using UnityEngine;
 using System.Collections;
 
 [RequireComponent(typeof(SpriteRenderer), typeof(Rigidbody2D), typeof(Animator))]
-public class Boss : MonoBehaviour
+public class Boss : MonoBehaviour, IHittable
 {
     [Header("Boss Settings")]
-    [SerializeField] private int maxHealth = 5;
+    [SerializeField] private int maxHealth = 20;
     [SerializeField] private float speed = 2.5f;
+
+    [Header("Сюжетный Сбор Духов (Крафт)")]
+    [Tooltip("Префаб сферы целительного духа (твоя монета/сфера с измененным скриптом Coin)")]
+    [SerializeField] private GameObject spiritOrbPrefab;
+    [Tooltip("Минимальное количество духов при гибели босса")]
+    [SerializeField] private int minSpirits = 150;
+    [Tooltip("Максимальное количество духов при гибели босса")]
+    [SerializeField] private int maxSpirits = 200;
     
     [Header("Portal (Spawn on death)")]
     [SerializeField] private GameObject portalPrefab;
@@ -35,6 +43,8 @@ public class Boss : MonoBehaviour
     private SpriteRenderer _spriteRenderer;
     private Rigidbody2D _rb;
     private Animator _anim;
+    private Collider2D[] _bossColliders;
+    private Collider2D[] _playerColliders;
 
     private void Start()
     {
@@ -43,15 +53,96 @@ public class Boss : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _anim = GetComponent<Animator>();
         
+        _bossColliders = GetComponentsInChildren<Collider2D>();
+        
         GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p != null) _player = p.transform;
+        if (p != null)
+        {
+            _player = p.transform;
+            _playerColliders = p.GetComponentsInChildren<Collider2D>();
+        }
 
         _startPosition = transform.position; 
     }
 
     private void Update()
     {
-        if (_isDead || _player == null) return;
+        if (_isDead) return;
+
+        // Если игрок еще не найден или переродился (старый объект удален), ищем его динамически!
+        if (_player == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null)
+            {
+                _player = p.transform;
+                _playerColliders = p.GetComponentsInChildren<Collider2D>();
+            }
+            else
+            {
+                return; // Игрока нет на сцене, ждем следующего кадра
+            }
+        }
+
+        // Динамическое отключение коллизии во время дэша, атак или при непосредственном пересечении тел
+        if (_playerColliders != null && _bossColliders != null)
+        {
+            PlayerMovement pm = _player.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                PlayerCombat pc = _player.GetComponent<PlayerCombat>();
+                bool isAttackingOrDashing = pm.IsDashing || (pc != null && pc.IsAttacking);
+                
+                foreach (var bossCol in _bossColliders)
+                {
+                    if (bossCol == null) continue;
+                    foreach (var playerCol in _playerColliders)
+                    {
+                        if (playerCol == null) continue;
+                        
+                        // Игнорируем коллизию, если игрок в рывке/атаке ИЛИ если они уже пересекаются.
+                        // Это исключает резкое выталкивание игрока под землю при окончании рывка!
+                        bool shouldIgnore = isAttackingOrDashing || bossCol.IsTouching(playerCol);
+                        Physics2D.IgnoreCollision(bossCol, playerCol, shouldIgnore);
+                    }
+                }
+            }
+        }
+
+        // Проверка и мгновенное нанесение контактного урона игроку вплотную (поскольку физическая коллизия игнорируется)
+        if (_playerColliders != null && _bossColliders != null && !_isDead)
+        {
+            PlayerMovement pm = _player.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                PlayerCombat pc = _player.GetComponent<PlayerCombat>();
+                bool isInvulnerable = pm.IsDashing || (pc != null && pc.IsThrustActive);
+                
+                if (!isInvulnerable)
+                {
+                    bool isTouching = false;
+                    foreach (var bossCol in _bossColliders)
+                    {
+                        if (bossCol == null || bossCol.gameObject.name == "HurtBox") continue; // Игнорируем HurtBox для контактного урона
+                        foreach (var playerCol in _playerColliders)
+                        {
+                            if (playerCol == null) continue;
+                            if (bossCol.IsTouching(playerCol))
+                            {
+                                isTouching = true;
+                                break;
+                            }
+                        }
+                        if (isTouching) break;
+                    }
+                    
+                    if (isTouching)
+                    {
+                        pm.TakeDamage(transform.position);
+                    }
+                }
+            }
+        }
 
         if (_attackTimer > 0) _attackTimer -= Time.deltaTime;
 
@@ -129,7 +220,7 @@ public class Boss : MonoBehaviour
         _isAttacking = false;
     }
 
-    // Добавляем контактный урон для Босса, как в Hollow Knight
+    // Добавляем контактный урон для Босса, как в Hollow Knight, с защитой от неуязвимости игрока
     private void OnCollisionStay2D(Collision2D collision)
     {
         if (_isDead) return;
@@ -142,7 +233,13 @@ public class Boss : MonoBehaviour
             PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
             if (pm != null)
             {
-                pm.TakeDamage(transform.position);
+                PlayerCombat pc = pm.GetComponent<PlayerCombat>();
+                bool isInvulnerable = pm.IsDashing || (pc != null && pc.IsThrustActive);
+
+                if (!isInvulnerable)
+                {
+                    pm.TakeDamage(transform.position);
+                }
             }
         }
     }
@@ -164,6 +261,20 @@ public class Boss : MonoBehaviour
         }
     }
 
+    public void HealToFull()
+    {
+        _currentHealth = maxHealth;
+        _isDead = false;
+        if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+        if (_spriteRenderer != null) _spriteRenderer.color = Color.white;
+    }
+
+    // Метод интерфейса IHittable для получения урона от меча игрока
+    public void OnHit(bool isHeavyAttack = false)
+    {
+        TakeDamage(isHeavyAttack ? 2 : 1);
+    }
+
     public void TakeDamage(int damage)
     {
         if (_isDead) return;
@@ -178,7 +289,11 @@ public class Boss : MonoBehaviour
         }
         else
         {
-            if (_anim != null) _anim.SetTrigger("Hit");
+            // Суперброня: не прерываем замах атаки, если босс бьет в данный момент
+            if (_anim != null && !_isAttacking)
+            {
+                _anim.SetTrigger("Hit");
+            }
             StartCoroutine(FlashRed());
         }
     }
@@ -200,8 +315,8 @@ public class Boss : MonoBehaviour
             _rb.gravityScale = 0f; 
         }
         
-        // Отключаем абсолютно все коллайдеры босса при смерти
-        Collider2D[] colliders = GetComponents<Collider2D>();
+        // Отключаем абсолютно все коллайдеры босса (включая HurtBox в дочерних объектах) при смерти
+        Collider2D[] colliders = GetComponentsInChildren<Collider2D>();
         foreach (var col in colliders)
         {
             col.enabled = false;
@@ -212,6 +327,42 @@ public class Boss : MonoBehaviour
             _anim.SetBool("IsDead", true);
             _anim.ResetTrigger("Hit");
             _anim.ResetTrigger("Attack");
+        }
+
+        // Спавним сферы духов (королевский салют из 8-12 сфер)
+        if (spiritOrbPrefab != null)
+        {
+            int totalSpirits = Random.Range(minSpirits, maxSpirits + 1);
+            int numOrbs = Random.Range(8, 13); // от 8 до 12 сфер для босса
+            int spawnedSpirits = 0;
+
+            for (int i = 0; i < numOrbs; i++)
+            {
+                int orbValue = (i == numOrbs - 1) ? (totalSpirits - spawnedSpirits) : (totalSpirits / numOrbs);
+                spawnedSpirits += orbValue;
+
+                if (orbValue > 0)
+                {
+                    GameObject orb = Instantiate(spiritOrbPrefab, transform.position, Quaternion.identity);
+                    Coin coinScript = orb.GetComponent<Coin>();
+                    if (coinScript != null)
+                    {
+                        coinScript.value = orbValue;
+                        coinScript.popForce = 8f; // Пошире разлетаются!
+                        coinScript.ApplyPopForce();
+                    }
+                }
+            }
+            Debug.Log($"[ДУХИ] Босс повержен! Освобожден салют из {totalSpirits} целительных духов в {numOrbs} сферах!");
+        }
+        else
+        {
+            if (GameManager.Instance != null)
+            {
+                int backupSpirits = Random.Range(minSpirits, maxSpirits + 1);
+                GameManager.Instance.AddScore(backupSpirits);
+                Debug.LogWarning($"[ДУХИ] spiritOrbPrefab не назначен в Boss! Начислено {backupSpirits} духов напрямую.");
+            }
         }
         
         if (portalPrefab != null)

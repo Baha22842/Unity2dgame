@@ -7,6 +7,9 @@ public class Projectile : MonoBehaviour
     public float lifetime = 3f;
     public int damage = 1;
 
+    [Tooltip("По умолчанию спрайт направлен влево? (Например, для стрел)")]
+    [SerializeField] private bool spriteFacesLeftByDefault = false;
+
     private Rigidbody2D rb;
     private Vector2 moveDirection;
 
@@ -21,18 +24,28 @@ public class Projectile : MonoBehaviour
     {
         moveDirection = dir.normalized;
 
-        // Flip sprite if moving left
+        Vector3 scale = transform.localScale;
+        float baseScaleX = Mathf.Abs(scale.x);
+
         if (moveDirection.x < 0)
         {
-            Vector3 scale = transform.localScale;
-            scale.x *= -1;
-            transform.localScale = scale;
+            // Летим влево:
+            scale.x = spriteFacesLeftByDefault ? baseScaleX : -baseScaleX;
         }
+        else if (moveDirection.x > 0)
+        {
+            // Летим вправо:
+            scale.x = spriteFacesLeftByDefault ? -baseScaleX : baseScaleX;
+        }
+
+        transform.localScale = scale;
     }
 
     private void Update()
     {
-        transform.Translate(moveDirection * speed * Time.deltaTime);
+        // Используем Space.World, чтобы изменение масштаба (scale.x) влияло только на визуал,
+        // но не меняло направление движения стрелы в мировом пространстве!
+        transform.Translate(moveDirection * speed * Time.deltaTime, Space.World);
     }
 
     private void OnTriggerEnter2D(Collider2D collision)

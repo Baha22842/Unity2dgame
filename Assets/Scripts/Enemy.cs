@@ -11,6 +11,14 @@ public class Enemy : MonoBehaviour
     [SerializeField] private EnemyType enemyType = EnemyType.PatrolGround;
     [SerializeField] private int maxHealth = 3;
 
+    [Header("Сюжетный Сбор Духов (Крафт)")]
+    [Tooltip("Префаб сферы целительного духа (твоя монета/сфера с измененным скриптом Coin)")]
+    [SerializeField] private GameObject spiritOrbPrefab;
+    [Tooltip("Минимальное количество духов при гибели")]
+    [SerializeField] private int minSpirits = 20;
+    [Tooltip("Максимальное количество духов при гибели")]
+    [SerializeField] private int maxSpirits = 30;
+
     [Header("Knockback Settings")]
     [SerializeField] private Vector2 knockbackForce = new Vector2(2f, 2f);
     [Tooltip("Если враг улетает слишком далеко, поставь значения меньше (например 1, 1). Если улетает в бездну (в яму), сделай Y побольше, а X поменьше.")]
@@ -431,6 +439,11 @@ public class Enemy : MonoBehaviour
         }
     }
 
+    public void HealToFull()
+    {
+        _currentHealth = maxHealth;
+    }
+
     // Метод вызывается мечом игрока
     public void TakeDamage(int damage)
     {
@@ -483,6 +496,41 @@ public class Enemy : MonoBehaviour
         }
         
         PlayAnim(ANIM_DEATH);
+
+        // Спавним сферы духов при гибели
+        if (spiritOrbPrefab != null)
+        {
+            int totalSpirits = Random.Range(minSpirits, maxSpirits + 1);
+            int numOrbs = Random.Range(3, 6); // от 3 до 5 сфер
+            int spawnedSpirits = 0;
+
+            for (int i = 0; i < numOrbs; i++)
+            {
+                int orbValue = (i == numOrbs - 1) ? (totalSpirits - spawnedSpirits) : (totalSpirits / numOrbs);
+                spawnedSpirits += orbValue;
+
+                if (orbValue > 0)
+                {
+                    GameObject orb = Instantiate(spiritOrbPrefab, transform.position, Quaternion.identity);
+                    Coin coinScript = orb.GetComponent<Coin>();
+                    if (coinScript != null)
+                    {
+                        coinScript.value = orbValue;
+                        coinScript.ApplyPopForce();
+                    }
+                }
+            }
+            Debug.Log($"[ДУХИ] Враг побежден! Высвобождено {totalSpirits} целительных духов в {numOrbs} сферах.");
+        }
+        else
+        {
+            if (GameManager.Instance != null)
+            {
+                int backupSpirits = Random.Range(minSpirits, maxSpirits + 1);
+                GameManager.Instance.AddScore(backupSpirits);
+                Debug.LogWarning($"[ДУХИ] spiritOrbPrefab не назначен во враге {gameObject.name}! Начислено {backupSpirits} духов напрямую.");
+            }
+        }
         
         // Замораживаем аниматор перед уничтожением объекта
         StartCoroutine(DisableAnimatorDelayed(1.1f));

@@ -197,6 +197,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BringerOfDeath
   maxHealth: 15
   speed: 2
+  spiritOrbPrefab: {fileID: 0}
+  minSpirits: 150
+  maxSpirits: 200
   meleeRange: 2
   rangedRange: 5
   attackCooldown: 3
@@ -217,8 +220,8 @@ MonoBehaviour:
   playerLayer:
     serializedVersion: 2
     m_Bits: 256
-  aggroRange: 10
-  tetherRange: 12
+  aggroRange: 12
+  tetherRange: 16
   faceRightByDefault: 0
   maxConsecutiveRangedCasts: 2
   chaseDurationBeforeRangedReset: 10

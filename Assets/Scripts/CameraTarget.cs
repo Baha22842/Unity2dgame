@@ -13,20 +13,17 @@ public class CameraTarget : MonoBehaviour
         // Список возможных типов виртуальных камер для Cinemachine v2 и v3
         string[] typeNames = new string[] 
         {
-            "Unity.Cinemachine.CinemachineCamera",           // Cinemachine v3 (новые версии Unity)
-            "Cinemachine.CinemachineVirtualCamera",          // Cinemachine v2 (старые версии Unity)
+            "Unity.Cinemachine.CinemachineCamera",           // Cinemachine v3 (Unity 6)
+            "Cinemachine.CinemachineVirtualCamera",          // Cinemachine v2
             "Unity.Cinemachine.CinemachineVirtualCamera"     // Переходные версии
         };
 
         Type cameraType = null;
         foreach (var name in typeNames)
         {
-            cameraType = Type.GetType(name + ", Unity.Cinemachine") 
-                         ?? Type.GetType(name + ", Cinemachine")
-                         ?? Type.GetType(name);
+            cameraType = CinemachineReflectionHelper.FindType(name);
             if (cameraType != null)
             {
-                // Нашли тип камеры! Пробуем найти объект этого типа на сцене
                 #pragma warning disable CS0618
                 cinemachineCam = FindObjectOfType(cameraType) as Component;
                 #pragma warning restore CS0618
@@ -39,14 +36,72 @@ public class CameraTarget : MonoBehaviour
 
         if (cinemachineCam != null && cameraType != null)
         {
-            // Пытаемся установить свойство Follow
-            PropertyInfo followProperty = cameraType.GetProperty("Follow");
-            if (followProperty != null)
+            // Используем BindingFlags для поиска как публичных, так и приватных свойств/полей
+            BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+            // В Cinemachine v3 свойство называется "TrackingTarget", в Cinemachine v2 - "Follow"
+            PropertyInfo targetProp = cameraType.GetProperty("TrackingTarget", flags)
+                                      ?? cameraType.GetProperty("Follow", flags);
+                                      
+            FieldInfo targetField = null;
+            if (targetProp == null)
             {
-                followProperty.SetValue(cinemachineCam, transform);
-                Debug.Log($"[CameraTarget] Успешно привязали виртуальную камеру {cameraType.Name} к игроку через рефлексию!");
-                return;
+                targetField = cameraType.GetField("TrackingTarget", flags)
+                              ?? cameraType.GetField("Follow", flags);
             }
+
+            // Дополнительно ищем LookAt для старых версий (v2)
+            PropertyInfo lookAtProp = cameraType.GetProperty("LookAt", flags);
+            if (lookAtProp != null)
+            {
+                try { lookAtProp.SetValue(cinemachineCam, transform); } catch { }
+            }
+
+            if (targetProp != null)
+            {
+                try { targetProp.SetValue(cinemachineCam, transform); } catch { }
+            }
+            else if (targetField != null)
+            {
+                try { targetField.SetValue(cinemachineCam, transform); } catch { }
+            }
+
+            // Дополнительно ищем любые субкомпоненты Cinemachine v3 на этом же объекте
+            // для 100% гарантии следования (например, CinemachineFollow, CinemachineRotationComposer и т.д.)
+            try
+            {
+                foreach (var component in cinemachineCam.GetComponents<Component>())
+                {
+                    if (component == null) continue;
+                    Type compType = component.GetType();
+                    string compName = compType.Name;
+
+                    if (compName.Contains("Follow") || compType.FullName.Contains("Follow"))
+                    {
+                        PropertyInfo p = compType.GetProperty("Target", flags) ?? compType.GetProperty("Follow", flags);
+                        if (p != null) p.SetValue(component, transform);
+                        
+                        FieldInfo f = compType.GetField("Target", flags) ?? compType.GetField("Follow", flags);
+                        if (f != null) f.SetValue(component, transform);
+                    }
+                    
+                    if (compName.Contains("LookAt") || compName.Contains("Composer") || compType.FullName.Contains("LookAt") || compType.FullName.Contains("Composer"))
+                    {
+                        PropertyInfo p = compType.GetProperty("LookAtTarget", flags) ?? compType.GetProperty("LookAt", flags);
+                        if (p != null) p.SetValue(component, transform);
+                        
+                        FieldInfo f = compType.GetField("LookAtTarget", flags) ?? compType.GetField("LookAt", flags);
+                        if (f != null) f.SetValue(component, transform);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[CameraTarget] Ошибка при настройке субкомпонентов Cinemachine: " + ex.Message);
+            }
+
+            Debug.Log("[CameraTarget] Успешно привязали виртуальную камеру и её субкомпоненты Cinemachine к игроку!");
+            return;
         }
 
         // 2. Если Cinemachine не используется или не найден, настраиваем обычную камеру со скриптом CameraFollow
@@ -66,14 +121,14 @@ public class CameraTarget : MonoBehaviour
         if (mainCam != null)
         {
             // Отключаем мешающий CinemachineBrain на главной камере, если виртуальная камера не используется
-            // (так как CinemachineBrain блокирует ручное перемещение камеры скриптом CameraFollow)
             try
             {
                 foreach (var comp in mainCam.GetComponents<Component>())
                 {
                     if (comp != null && (comp.GetType().Name == "CinemachineBrain" || comp.GetType().FullName.Contains("CinemachineBrain")))
                     {
-                        PropertyInfo enabledProp = comp.GetType().GetProperty("enabled");
+                        BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                        PropertyInfo enabledProp = comp.GetType().GetProperty("enabled", flags);
                         if (enabledProp != null)
                         {
                             enabledProp.SetValue(comp, false);

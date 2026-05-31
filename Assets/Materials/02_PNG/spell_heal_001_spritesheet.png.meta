@@ -1,0 +1,644 @@
+fileFormatVersion: 2
+guid: e91494bb2a4a4224580e02dfe23766dc
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 5846138874008674345
+    second: spell_heal_001_spritesheet_0
+  - first:
+      213: 2854350207436394891
+    second: spell_heal_001_spritesheet_1
+  - first:
+      213: 1032760277442881252
+    second: spell_heal_001_spritesheet_2
+  - first:
+      213: -4040594842314364456
+    second: spell_heal_001_spritesheet_3
+  - first:
+      213: 7200477859023440316
+    second: spell_heal_001_spritesheet_4
+  - first:
+      213: 1594443601561612766
+    second: spell_heal_001_spritesheet_5
+  - first:
+      213: 2717228224542621730
+    second: spell_heal_001_spritesheet_6
+  - first:
+      213: -3154866192178135983
+    second: spell_heal_001_spritesheet_7
+  - first:
+      213: 7724977419396814657
+    second: spell_heal_001_spritesheet_8
+  - first:
+      213: 4852324679839975342
+    second: spell_heal_001_spritesheet_9
+  - first:
+      213: -6081242740752638971
+    second: spell_heal_001_spritesheet_10
+  - first:
+      213: -6992970923601369107
+    second: spell_heal_001_spritesheet_11
+  - first:
+      213: -19397671662253839
+    second: spell_heal_001_spritesheet_12
+  - first:
+      213: 339798159359125619
+    second: spell_heal_001_spritesheet_13
+  - first:
+      213: 96569841996496782
+    second: spell_heal_001_spritesheet_14
+  - first:
+      213: -1188312510612862825
+    second: spell_heal_001_spritesheet_15
+  - first:
+      213: -5821947722351546801
+    second: spell_heal_001_spritesheet_16
+  - first:
+      213: 8322398479842593680
+    second: spell_heal_001_spritesheet_17
+  - first:
+      213: 7973232759228729128
+    second: spell_heal_001_spritesheet_18
+  - first:
+      213: -5127325506821637215
+    second: spell_heal_001_spritesheet_19
+  - first:
+      213: 478692523955136302
+    second: spell_heal_001_spritesheet_20
+  - first:
+      213: -3498764305389568768
+    second: spell_heal_001_spritesheet_21
+  - first:
+      213: -7469981138368206456
+    second: spell_heal_001_spritesheet_22
+  - first:
+      213: 473916858017475494
+    second: spell_heal_001_spritesheet_23
+  - first:
+      213: 8336342657883592798
+    second: spell_heal_001_spritesheet_24
+  - first:
+      213: -29565002207763045
+    second: spell_heal_001_spritesheet_25
+  - first:
+      213: -1858759703600715317
+    second: spell_heal_001_spritesheet_26
+  - first:
+      213: -5262508562277077319
+    second: spell_heal_001_spritesheet_27
+  - first:
+      213: -4746558829096588520
+    second: spell_heal_001_spritesheet_28
+  - first:
+      213: 800365907610274310
+    second: spell_heal_001_spritesheet_29
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: iOS
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WindowsStoreApps
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_0
+      rect:
+        serializedVersion: 2
+        x: 7
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 920a3ece458a12150800000000000000
+      internalID: 5846138874008674345
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_1
+      rect:
+        serializedVersion: 2
+        x: 263
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b811fc20460bc9720800000000000000
+      internalID: 2854350207436394891
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_2
+      rect:
+        serializedVersion: 2
+        x: 913
+        y: 16
+        width: 30
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4e6ed13200a155e00800000000000000
+      internalID: 1032760277442881252
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_5
+      rect:
+        serializedVersion: 2
+        x: 327
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ed17975020a902610800000000000000
+      internalID: 1594443601561612766
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_8
+      rect:
+        serializedVersion: 2
+        x: 391
+        y: 7
+        width: 50
+        height: 49
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1479f05c802a43b60800000000000000
+      internalID: 7724977419396814657
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_10
+      rect:
+        serializedVersion: 2
+        x: 457
+        y: 9
+        width: 46
+        height: 46
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 50c148472f51b9ba0800000000000000
+      internalID: -6081242740752638971
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_11
+      rect:
+        serializedVersion: 2
+        x: 524
+        y: 12
+        width: 40
+        height: 40
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: de7ea1ecef9f3fe90800000000000000
+      internalID: -6992970923601369107
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_12
+      rect:
+        serializedVersion: 2
+        x: 591
+        y: 15
+        width: 34
+        height: 34
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1f80a1f9be51bbff0800000000000000
+      internalID: -19397671662253839
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_13
+      rect:
+        serializedVersion: 2
+        x: 658
+        y: 15
+        width: 28
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 378aee720a437b400800000000000000
+      internalID: 339798159359125619
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_14
+      rect:
+        serializedVersion: 2
+        x: 721
+        y: 14
+        width: 30
+        height: 34
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e8f773872c5175100800000000000000
+      internalID: 96569841996496782
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_15
+      rect:
+        serializedVersion: 2
+        x: 785
+        y: 15
+        width: 30
+        height: 33
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 79884ca4114428fe0800000000000000
+      internalID: -1188312510612862825
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_16
+      rect:
+        serializedVersion: 2
+        x: 849
+        y: 14
+        width: 30
+        height: 34
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f4e675c7469443fa0800000000000000
+      internalID: -5821947722351546801
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_18
+      rect:
+        serializedVersion: 2
+        x: 977
+        y: 16
+        width: 30
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 827065553fc96ae60800000000000000
+      internalID: 7973232759228729128
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_30
+      rect:
+        serializedVersion: 2
+        x: 71
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 655b002f427b1e843975b3f9f0f8c6f4
+      internalID: 377486754
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_31
+      rect:
+        serializedVersion: 2
+        x: 135
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 703a1d9cc5eba5d47a69c50b1d52472a
+      internalID: -890723043
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: spell_heal_001_spritesheet_32
+      rect:
+        serializedVersion: 2
+        x: 199
+        y: 7
+        width: 50
+        height: 50
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7e36233a79601e14dbd040a79fe4cb9e
+      internalID: -299259020
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 86ab22e876014ed4aaac75135ae6e5b9
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      spell_heal_001_spritesheet_0: 5846138874008674345
+      spell_heal_001_spritesheet_1: 2854350207436394891
+      spell_heal_001_spritesheet_10: -6081242740752638971
+      spell_heal_001_spritesheet_11: -6992970923601369107
+      spell_heal_001_spritesheet_12: -19397671662253839
+      spell_heal_001_spritesheet_13: 339798159359125619
+      spell_heal_001_spritesheet_14: 96569841996496782
+      spell_heal_001_spritesheet_15: -1188312510612862825
+      spell_heal_001_spritesheet_16: -5821947722351546801
+      spell_heal_001_spritesheet_17: 8322398479842593680
+      spell_heal_001_spritesheet_18: 7973232759228729128
+      spell_heal_001_spritesheet_19: -5127325506821637215
+      spell_heal_001_spritesheet_2: 1032760277442881252
+      spell_heal_001_spritesheet_20: 478692523955136302
+      spell_heal_001_spritesheet_21: -3498764305389568768
+      spell_heal_001_spritesheet_22: -7469981138368206456
+      spell_heal_001_spritesheet_23: 473916858017475494
+      spell_heal_001_spritesheet_24: 8336342657883592798
+      spell_heal_001_spritesheet_25: -29565002207763045
+      spell_heal_001_spritesheet_26: -1858759703600715317
+      spell_heal_001_spritesheet_27: -5262508562277077319
+      spell_heal_001_spritesheet_28: -4746558829096588520
+      spell_heal_001_spritesheet_29: 800365907610274310
+      spell_heal_001_spritesheet_3: -4040594842314364456
+      spell_heal_001_spritesheet_30: 377486754
+      spell_heal_001_spritesheet_31: -890723043
+      spell_heal_001_spritesheet_32: -299259020
+      spell_heal_001_spritesheet_4: 7200477859023440316
+      spell_heal_001_spritesheet_5: 1594443601561612766
+      spell_heal_001_spritesheet_6: 2717228224542621730
+      spell_heal_001_spritesheet_7: -3154866192178135983
+      spell_heal_001_spritesheet_8: 7724977419396814657
+      spell_heal_001_spritesheet_9: 4852324679839975342
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

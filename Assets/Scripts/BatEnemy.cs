@@ -1,0 +1,387 @@
+using UnityEngine;
+using System.Collections;
+
+[RequireComponent(typeof(Rigidbody2D), typeof(SpriteRenderer), typeof(Collider2D))]
+public class BatEnemy : MonoBehaviour, IHittable
+{
+    [Header("Характеристики летучей мыши")]
+    [SerializeField] private int maxHealth = 2;
+    [SerializeField] private float speed = 3f;
+
+    [Header("Аггро и Зона привязки (Tether Zone)")]
+    [SerializeField] private float aggroRange = 8f;
+    [Tooltip("Максимальное расстояние, на которое мышь может улететь от точки спавна перед возвратом.")]
+    [SerializeField] private float tetherRange = 12f;
+    
+    [Header("Сюжетный Сбор Духов (Крафт)")]
+    [Tooltip("Префаб сферы целительного духа (твоя монета/сфера с измененным скриптом Coin)")]
+    [SerializeField] private GameObject spiritOrbPrefab;
+    [SerializeField] private int minSpirits = 15;
+    [SerializeField] private int maxSpirits = 25;
+
+    [Header("Настройки Атаки (Анимационный радиус)")]
+    [SerializeField] private Transform attackPoint;
+    [SerializeField] private float attackRadius = 1.5f;
+    [SerializeField] private float attackRange = 2.2f;
+    [SerializeField] private float attackCooldown = 2f;
+    [SerializeField] private float attackDuration = 0.5f;
+    [SerializeField] private LayerMask playerLayer;
+
+    [Header("Настройки Спрайта")]
+    [Tooltip("Спрайт по умолчанию смотрит вправо? (Если нарисован смотрящим влево, сними галочку)")]
+    [SerializeField] private bool faceRightByDefault = true;
+
+    [Header("Настройки Патрулирования (Патруль по воздуху)")]
+    [Tooltip("Радиус патрулирования туда-сюда относительно точки спавна, когда игрок не замечен.")]
+    [SerializeField] private float patrolRange = 3f;
+    [Tooltip("Множитель скорости во время патрулирования (чтобы мышь летала спокойнее).")]
+    [SerializeField] private float patrolSpeedMultiplier = 0.5f;
+    [Tooltip("Время паузы на крайних точках патрулирования перед поворотом.")]
+    [SerializeField] private float patrolWaitTime = 1.2f;
+
+    [Header("Настройки Отбрасывания (Knockback)")]
+    [SerializeField] private Vector2 knockbackForce = new Vector2(3f, 3f);
+
+    private int _currentHealth;
+    private bool _isDead = false;
+    private bool _isAttacking = false;
+    private float _cooldownTimer = 0f;
+    private int _facingDirection = 1; // 1 = Вправо, -1 = Влево
+    private Vector2 _startPosition; // Стартовая точка спавна
+
+    // Состояние патруля
+    private int _patrolDirection = 1; // 1 = Вправо, -1 = Влево
+    private float _patrolWaitTimer = 0f;
+    private bool _isReturning = false;
+
+    private Rigidbody2D _rb;
+    private SpriteRenderer _spriteRenderer;
+    private Animator _animator;
+    private Transform _playerTransform;
+    private Color _originalColor;
+
+    private void Awake()
+    {
+        _rb = GetComponent<Rigidbody2D>();
+        _spriteRenderer = GetComponent<SpriteRenderer>();
+        _animator = GetComponent<Animator>();
+        
+        _currentHealth = maxHealth;
+        _originalColor = _spriteRenderer.color;
+
+        // Летучая мышь летает — отключаем гравитацию
+        _rb.gravityScale = 0f;
+        _rb.freezeRotation = true;
+
+        // Инициализируем направление взгляда на старте
+        _facingDirection = 1;
+    }
+
+    private void Start()
+    {
+        // Запоминаем точку спавна
+        _startPosition = transform.position;
+
+        // Ищем игрока на сцене
+        GameObject p = GameObject.FindGameObjectWithTag("Player");
+        if (p != null) _playerTransform = p.transform;
+
+        // Случайное направление патруля при старте
+        _patrolDirection = Random.value > 0.5f ? 1 : -1;
+    }
+
+    private void Update()
+    {
+        if (_isDead) return;
+
+        if (_cooldownTimer > 0f) _cooldownTimer -= Time.deltaTime;
+
+        if (_playerTransform == null) return;
+
+        float distanceToPlayer = Vector2.Distance(transform.position, _playerTransform.position);
+        float distanceFromStart = Vector2.Distance(transform.position, _startPosition);
+
+        if (_isAttacking)
+        {
+            // Во время анимации атаки зависаем
+            _rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
+        // Мышь преследует только если игрок близко И сама мышь не улетела дальше своей зоны привязки
+        bool shouldChase = distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange;
+
+        if (shouldChase)
+        {
+            _isReturning = false; // Сбрасываем возврат при аггро
+            _patrolWaitTimer = 0f; // Сбрасываем ожидание патруля
+
+            // Поворот к игроку
+            float dirToPlayer = Mathf.Sign(_playerTransform.position.x - transform.position.x);
+            if ((int)dirToPlayer != _facingDirection)
+            {
+                SetFacingDirection((int)dirToPlayer);
+            }
+
+            if (distanceToPlayer <= attackRange && _cooldownTimer <= 0f)
+            {
+                StartCoroutine(AttackRoutine());
+            }
+            else
+            {
+                // Преследуем по воздуху
+                Vector2 flyDirection = ((Vector2)_playerTransform.position - (Vector2)transform.position).normalized;
+                _rb.linearVelocity = flyDirection * speed;
+            }
+        }
+        else
+        {
+            // Если мы улетели слишком далеко от базы во время погони, включаем режим возврата
+            if (distanceFromStart > tetherRange)
+            {
+                _isReturning = true;
+            }
+
+            if (_isReturning)
+            {
+                // Возвращаемся к стартовой позиции
+                if (distanceFromStart > 0.5f)
+                {
+                    Vector2 returnDirection = (_startPosition - (Vector2)transform.position).normalized;
+                    // Красивое волнообразное покачивание при полете назад
+                    float bobbing = Mathf.Sin(Time.time * 6f) * 0.4f;
+                    _rb.linearVelocity = new Vector2(returnDirection.x * speed, returnDirection.y * speed + bobbing);
+
+                    // Поворачиваемся лицом к цели полета
+                    float dirToTarget = Mathf.Sign(returnDirection.x);
+                    if (Mathf.Abs(returnDirection.x) > 0.1f && (int)dirToTarget != _facingDirection)
+                    {
+                        SetFacingDirection((int)dirToTarget);
+                    }
+                }
+                else
+                {
+                    // Вернулись домой — выключаем возврат и переходим к обычному патрулированию
+                    _isReturning = false;
+                    _rb.linearVelocity = Vector2.zero;
+                }
+            }
+            else
+            {
+                // Режим патрулирования туда-сюда
+                if (_patrolWaitTimer > 0f)
+                {
+                    _patrolWaitTimer -= Time.deltaTime;
+                    // Зависаем на месте с легким вертикальным покачиванием
+                    float bobbing = Mathf.Sin(Time.time * 5f) * 0.3f;
+                    _rb.linearVelocity = new Vector2(0f, bobbing);
+
+                    // Когда время ожидания вышло, меняем направление движения
+                    if (_patrolWaitTimer <= 0f)
+                    {
+                        _patrolDirection *= -1;
+                    }
+                }
+                else
+                {
+                    // Проверяем, не вышли ли мы за границы патрулирования
+                    bool reachedRightBound = _patrolDirection == 1 && transform.position.x >= _startPosition.x + patrolRange;
+                    bool reachedLeftBound = _patrolDirection == -1 && transform.position.x <= _startPosition.x - patrolRange;
+
+                    if (reachedRightBound || reachedLeftBound)
+                    {
+                        // Начинаем паузу перед поворотом
+                        _patrolWaitTimer = patrolWaitTime;
+                        _rb.linearVelocity = Vector2.zero;
+                    }
+                    else
+                    {
+                        // Летим в направлении патрулирования
+                        float patrolSpeed = speed * patrolSpeedMultiplier;
+                        float bobbing = Mathf.Sin(Time.time * 6f) * 0.4f;
+                        _rb.linearVelocity = new Vector2(_patrolDirection * patrolSpeed, bobbing);
+
+                        // Поворачиваем спрайт по направлению полета
+                        if (_patrolDirection != _facingDirection)
+                        {
+                            SetFacingDirection(_patrolDirection);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private IEnumerator AttackRoutine()
+    {
+        _isAttacking = true;
+        _rb.linearVelocity = Vector2.zero;
+
+        // Запуск анимации атаки (триггер Attack)
+        if (_animator != null)
+        {
+            _animator.SetTrigger("Attack");
+        }
+
+        // Ждем длительность анимации атаки
+        yield return new WaitForSeconds(attackDuration);
+
+        _isAttacking = false;
+        _cooldownTimer = attackCooldown;
+    }
+
+    // ВЫЗЫВАЙ ЭТОТ МЕТОД ИЗ ANIMATION EVENT В СВОЕЙ АНИМАЦИИ АТАКИ!
+    // Точно так же, как у голема (TriggerAttackHitbox), чтобы нанести урон в нужный кадр анимации звуковой волны.
+    public void TriggerAttackHitbox()
+    {
+        if (_isDead) return;
+
+        Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
+        Collider2D playerCol = Physics2D.OverlapCircle(checkPos, attackRadius, playerLayer);
+
+        if (playerCol != null)
+        {
+            PlayerMovement pm = playerCol.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                pm.TakeDamage(transform.position);
+                Debug.Log("[BAT] Урон звуковой волной из анимации успешно нанесен игроку!");
+            }
+        }
+    }
+
+    private void SetFacingDirection(int direction)
+    {
+        if (direction == 0) return;
+        _facingDirection = direction;
+        
+        if (_spriteRenderer != null)
+        {
+            // Переворачиваем галочку Flip X прямо в компоненте Sprite Renderer.
+            // Это самый простой, стандартный и надежный способ для 2D-спрайтов,
+            // который никогда не конфликтует с физикой Rigidbody2D или масштабом Animator!
+            _spriteRenderer.flipX = faceRightByDefault ? (_facingDirection == -1) : (_facingDirection == 1);
+        }
+    }
+
+    // Совместимость с мечом игрока через интерфейс IHittable
+    public void OnHit(bool isHeavyAttack = false)
+    {
+        TakeDamage(isHeavyAttack ? 2 : 1);
+    }
+
+    public void TakeDamage(int damage)
+    {
+        if (_isDead) return;
+
+        _currentHealth -= damage;
+
+        if (_currentHealth <= 0)
+        {
+            ChangeStateToDead();
+        }
+        else
+        {
+            // Отдача при ударе (Knockback)
+            if (_playerTransform != null)
+            {
+                float knockbackDir = Mathf.Sign(transform.position.x - _playerTransform.position.x);
+                _rb.linearVelocity = new Vector2(knockbackDir * knockbackForce.x, knockbackForce.y);
+            }
+            StartCoroutine(FlashRed());
+        }
+    }
+
+    private IEnumerator FlashRed()
+    {
+        _spriteRenderer.color = Color.red;
+        yield return new WaitForSeconds(0.2f);
+        _spriteRenderer.color = _originalColor;
+    }
+
+    private void ChangeStateToDead()
+    {
+        _isDead = true;
+        StopAllCoroutines();
+        _spriteRenderer.color = _originalColor;
+
+        _rb.linearVelocity = Vector2.zero;
+        // Включаем гравитацию, чтобы тушка мыши упала на землю при смерти
+        _rb.gravityScale = 1.5f;
+
+        // Отключаем физические коллайдеры
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        foreach (var col in colliders)
+        {
+            col.enabled = false;
+        }
+
+        if (_animator != null)
+        {
+            _animator.SetBool("IsDead", true);
+        }
+
+        // Спавним сферы духов при гибели
+        if (spiritOrbPrefab != null)
+        {
+            int totalSpirits = Random.Range(minSpirits, maxSpirits + 1);
+            int numOrbs = Random.Range(2, 4); // от 2 до 3 сфер
+            int spawnedSpirits = 0;
+
+            for (int i = 0; i < numOrbs; i++)
+            {
+                int orbValue = (i == numOrbs - 1) ? (totalSpirits - spawnedSpirits) : (totalSpirits / numOrbs);
+                spawnedSpirits += orbValue;
+
+                if (orbValue > 0)
+                {
+                    GameObject orb = Instantiate(spiritOrbPrefab, transform.position, Quaternion.identity);
+                    Coin coinScript = orb.GetComponent<Coin>();
+                    if (coinScript != null)
+                    {
+                        coinScript.value = orbValue;
+                        coinScript.ApplyPopForce();
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (GameManager.Instance != null)
+            {
+                int backupSpirits = Random.Range(minSpirits, maxSpirits + 1);
+                GameManager.Instance.AddScore(backupSpirits);
+            }
+        }
+
+        Destroy(gameObject, 2f);
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        // Зона агрессии (жёлтая)
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, aggroRange);
+
+        // Радиус атаки (красный)
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, attackRange);
+
+        // Хитбокс удара звуковой волны (фиолетовый)
+        Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(checkPos, attackRadius);
+
+        // Зона привязки к точке спавна (синяя)
+        Gizmos.color = Color.blue;
+        Vector3 spawnCenter = Application.isPlaying ? (Vector3)_startPosition : transform.position;
+        Gizmos.DrawWireSphere(spawnCenter, tetherRange);
+    }
+
+    #if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (attackPoint == null) attackPoint = transform.Find("AttackPoint");
+    }
+    #endif
+}

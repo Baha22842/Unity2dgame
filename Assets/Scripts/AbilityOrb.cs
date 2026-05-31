@@ -6,7 +6,8 @@ public class AbilityOrb : MonoBehaviour
     {
         DoubleJump,
         Dash,
-        HeavyAttack
+        HeavyAttack,
+        Thrust
     }
 
     [Header("Настройки Способности")]

@@ -15,6 +15,14 @@ public class BringerOfDeath : MonoBehaviour, IHittable
     [SerializeField] private int maxHealth = 15;
     [SerializeField] private float speed = 2f;
 
+    [Header("Сюжетный Сбор Духов (Крафт)")]
+    [Tooltip("Префаб сферы целительного духа (твоя монета/сфера с измененным скриптом Coin)")]
+    [SerializeField] private GameObject spiritOrbPrefab;
+    [Tooltip("Минимальное количество духов при гибели босса")]
+    [SerializeField] private int minSpirits = 150;
+    [Tooltip("Максимальное количество духов при гибели босса")]
+    [SerializeField] private int maxSpirits = 200;
+
     [Header("Дистанция атаки")]
     [Tooltip("Расстояние для обычной атаки мечом")]
     [SerializeField] private float meleeRange = 3.8f;
@@ -115,7 +123,22 @@ public class BringerOfDeath : MonoBehaviour, IHittable
 
     private void Update()
     {
-        if (_isDead || _player == null) return;
+        if (_isDead) return;
+
+        // Если игрок еще не найден или переродился (старый объект удален), ищем его динамически!
+        if (_player == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null)
+            {
+                _player = p.transform;
+                _playerColliders = p.GetComponentsInChildren<Collider2D>();
+            }
+            else
+            {
+                return; // Игрока нет на сцене, ждем следующего кадра
+            }
+        }
 
         // Динамическое отключение коллизии во время дэша, атак или при непосредственном пересечении тел
         if (_playerColliders != null && _bossColliders != null)
@@ -460,6 +483,14 @@ public class BringerOfDeath : MonoBehaviour, IHittable
         }
     }
 
+    public void HealToFull()
+    {
+        _currentHealth = maxHealth;
+        _isDead = false;
+        if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
+        if (_spriteRenderer != null) _spriteRenderer.color = Color.white;
+    }
+
     /// <summary>
     /// Метод интерфейса IHittable для получения урона от игрока
     /// </summary>
@@ -493,6 +524,7 @@ public class BringerOfDeath : MonoBehaviour, IHittable
     private void Die()
     {
         _isDead = true;
+        StopAllCoroutines(); // Предотвращаем любые корутины атак после смерти
 
         if (_rb != null)
         {
@@ -511,11 +543,49 @@ public class BringerOfDeath : MonoBehaviour, IHittable
         if (_anim != null)
         {
             _anim.SetBool("IsDead", true);
-            _anim.SetTrigger("Die");
+            _anim.SetFloat("Speed", 0f); // Сбрасываем скорость, чтобы исключить переход в анимацию ходьбы
             _anim.Play("PurpleBossDie"); // Принудительный прямой запуск стейта смерти, если граф переходов сломан
             _anim.ResetTrigger("Hit");
             _anim.ResetTrigger("Attack");
             _anim.ResetTrigger("RangeAttack");
+            _anim.ResetTrigger("RangeAttack2"); // Сбрасываем все атаки
+        }
+
+        // Спавним сферы духов (королевский салют из 8-12 сфер)
+        if (spiritOrbPrefab != null)
+        {
+            int totalSpirits = Random.Range(minSpirits, maxSpirits + 1);
+            int numOrbs = Random.Range(8, 13); // от 8 до 12 сфер для босса
+            int spawnedSpirits = 0;
+
+            for (int i = 0; i < numOrbs; i++)
+            {
+                int orbValue = (i == numOrbs - 1) ? (totalSpirits - spawnedSpirits) : (totalSpirits / numOrbs);
+                spawnedSpirits += orbValue;
+
+                if (orbValue > 0)
+                {
+                    GameObject orb = Instantiate(spiritOrbPrefab, transform.position, Quaternion.identity);
+                    Coin coinScript = orb.GetComponent<Coin>();
+                    if (coinScript != null)
+                    {
+                        coinScript.value = orbValue;
+                        // Сила разброса для босса чуть больше, чтобы разлеталось шире!
+                        coinScript.popForce = 8f; 
+                        coinScript.ApplyPopForce();
+                    }
+                }
+            }
+            Debug.Log($"[ДУХИ] Босс Bringer of Death повержен! Освобожден салют из {totalSpirits} целительных духов в {numOrbs} сферах!");
+        }
+        else
+        {
+            if (GameManager.Instance != null)
+            {
+                int backupSpirits = Random.Range(minSpirits, maxSpirits + 1);
+                GameManager.Instance.AddScore(backupSpirits);
+                Debug.LogWarning($"[ДУХИ] spiritOrbPrefab не назначен в BringerOfDeath! Начислено {backupSpirits} духов напрямую.");
+            }
         }
 
         // Спавн портала на следующий уровень
@@ -525,7 +595,7 @@ public class BringerOfDeath : MonoBehaviour, IHittable
             Instantiate(portalPrefab, spawnPos, Quaternion.identity);
         }
 
-        Destroy(gameObject, 2.5f); // Даем 2.5 секунды на проигрывание анимации смерти
+        Destroy(gameObject, 1.3f); // Даем 1.3 секунды на проигрывание анимации смерти
     }
 
     private void OnDrawGizmosSelected()

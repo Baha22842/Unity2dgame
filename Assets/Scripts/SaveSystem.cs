@@ -7,11 +7,13 @@ public class SaveData
     public int score;
     public int lives;
     public int currentLevelIndex;
+    public int maxHealth;
     
     // Навыки (Метроидвания)
     public bool hasDoubleJump;
     public bool hasDash;
     public bool hasHeavyAttack;
+    public bool hasThrust;
 
     // Сюжетные предметы
     public int collectedArtifacts;
@@ -32,16 +34,18 @@ public static class SaveSystem
         return Application.persistentDataPath + "/game_save_slot_" + slotIndex + ".json";
     }
 
-    public static void SaveGame(int slotIndex, int _score, int _lives, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, int _artifacts, System.Collections.Generic.List<string> _exploredRooms, float _totalPlayTime)
+    public static void SaveGame(int slotIndex, int _score, int _lives, int _maxHealth, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, bool _thrust, int _artifacts, System.Collections.Generic.List<string> _exploredRooms, float _totalPlayTime)
     {
         SaveData data = new SaveData
         {
             score = _score,
             lives = _lives,
+            maxHealth = _maxHealth,
             currentLevelIndex = _levelIndex,
             hasDoubleJump = _doubleJump,
             hasDash = _dash,
             hasHeavyAttack = _heavyAttack,
+            hasThrust = _thrust,
             collectedArtifacts = _artifacts,
             exploredRooms = _exploredRooms,
             totalPlayTime = _totalPlayTime

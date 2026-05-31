@@ -145,7 +145,7 @@ public class PlayerCombat : MonoBehaviour
         {
             StartAttack(3);
         }
-        else if (Input.GetKeyDown(thrustKey) && _thrustCooldownTimer <= 0f)
+        else if (Input.GetKeyDown(thrustKey) && _thrustCooldownTimer <= 0f && GameManager.Instance != null && GameManager.Instance.hasThrust)
         {
             StartAttack(4); 
         }

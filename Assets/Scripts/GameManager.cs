@@ -15,6 +15,12 @@ public class GameManager : MonoBehaviour
             Instance.currentHealth = Instance.maxHealth;
             Instance.collectedArtifacts = 0;
             Instance.totalPlayTime = 0f;
+            Instance.potionsCount = 0;
+
+            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
+            PlayerPrefs.DeleteKey(potionsKey);
+            PlayerPrefs.Save();
+
             Instance.SaveGameData();
         }
     }
@@ -23,11 +29,33 @@ public class GameManager : MonoBehaviour
     public bool hasDoubleJump = false;
     public bool hasDash = false;
     public bool hasHeavyAttack = false;
+    public bool hasThrust = false;
+
+    [Header("Зелья Целительного Духа")]
+    public int potionsCount;
+    public int maxPotions = 3;
+    public int coinCraftCost = 30;
+    public bool autoCraftPotionWithCoins = true;
+
+    [Header("Штраф при смерти")]
+    [Range(0f, 1f)] public float soulLossPercentage = 0.45f;
 
     public void SaveGameData()
     {
-        // Мы сохраняем currentHealth в параметр lives, чтобы не ломать SaveSystem
-        SaveSystem.SaveGame(SaveSystem.SelectedSlot, score, currentHealth, UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex, hasDoubleJump, hasDash, hasHeavyAttack, collectedArtifacts, exploredRooms, totalPlayTime);
+        SaveSystem.SaveGame(
+            SaveSystem.SelectedSlot,
+            score,
+            currentHealth,
+            maxHealth,
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex,
+            hasDoubleJump,
+            hasDash,
+            hasHeavyAttack,
+            hasThrust,
+            collectedArtifacts,
+            exploredRooms,
+            totalPlayTime
+        );
     }
 
     [Header("Player")]
@@ -68,6 +96,8 @@ public class GameManager : MonoBehaviour
     private float totalPlayTime = 0f;
 
     public int Score => score;
+    public int CurrentHealth => currentHealth;
+    public bool IsHealthFull => currentHealth >= maxHealth;
     public bool IsGameOver { get; private set; }
 
     private void Awake()
@@ -105,10 +135,15 @@ public class GameManager : MonoBehaviour
             hasDoubleJump = data.hasDoubleJump;
             hasDash = data.hasDash;
             hasHeavyAttack = data.hasHeavyAttack;
+            hasThrust = data.hasThrust;
 
             collectedArtifacts = data.collectedArtifacts;
             exploredRooms = data.exploredRooms != null ? data.exploredRooms : new System.Collections.Generic.List<string>();
             totalPlayTime = data.totalPlayTime;
+
+            // Загружаем количество зелий из PlayerPrefs для этого слота
+            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
+            potionsCount = PlayerPrefs.GetInt(potionsKey, 0);
         }
         else
         {
@@ -117,9 +152,16 @@ public class GameManager : MonoBehaviour
             hasDoubleJump = false;
             hasDash = false;
             hasHeavyAttack = false;
+            hasThrust = false;
             collectedArtifacts = 0;
             exploredRooms = new System.Collections.Generic.List<string>();
             totalPlayTime = 0f;
+
+            potionsCount = 0;
+            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
+            PlayerPrefs.DeleteKey(potionsKey);
+            PlayerPrefs.Save();
+
             SaveGameData();
         }
 
@@ -154,6 +196,7 @@ public class GameManager : MonoBehaviour
     public void AddScore(int amount)
     {
         score += amount;
+        TryAutoCraftPotion();
         SaveGameData();
         UpdateScoreUI();
     }
@@ -165,9 +208,63 @@ public class GameManager : MonoBehaviour
             case "DoubleJump": hasDoubleJump = true; break;
             case "Dash": hasDash = true; break;
             case "HeavyAttack": hasHeavyAttack = true; break;
+            case "Thrust": hasThrust = true; break;
         }
         SaveGameData();
         Debug.Log("Разблокирован новый навык: " + abilityName);
+    }
+
+    public void TryAutoCraftPotion()
+    {
+        if (autoCraftPotionWithCoins && potionsCount < maxPotions)
+        {
+            while (score >= coinCraftCost && potionsCount < maxPotions)
+            {
+                score -= coinCraftCost;
+                potionsCount++;
+                Debug.Log($"🏺 [КРАФТ] Автоматически создано зелье целительного духа! Зелий: {potionsCount}/{maxPotions}. Оставшиеся духи: {score}");
+                
+                string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
+                PlayerPrefs.SetInt(potionsKey, potionsCount);
+                PlayerPrefs.Save();
+            }
+        }
+    }
+
+    public void UsePotion()
+    {
+        if (potionsCount > 0)
+        {
+            potionsCount--;
+            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
+            PlayerPrefs.SetInt(potionsKey, potionsCount);
+            PlayerPrefs.Save();
+
+            Heal(maxHealth); // Полное исцеление при использовании зелья
+            Debug.Log($"🏺 [ЗЕЛЬЕ] Зелье использовано! Здоровье восстановлено до максимума. Зелий осталось: {potionsCount}");
+        }
+    }
+
+    public void IncreaseMaxHealth(int amount = 1)
+    {
+        maxHealth += amount;
+        
+        if (healthPoints != null)
+        {
+            if (maxHealth > healthPoints.Length)
+            {
+                maxHealth = healthPoints.Length;
+            }
+            _heartCoroutines = new Coroutine[healthPoints.Length];
+        }
+        
+        currentHealth = maxHealth;
+        SaveGameData();
+        
+        _visualHealth = -1;
+        UpdateHealthUI();
+        
+        Debug.Log($"💖 [МАКС ХП] Максимальное здоровье увеличено на {amount}! Текущее макс ХП: {maxHealth}");
     }
 
     // --- ЛОГИКА АРТЕФАКТОВ ---
@@ -216,8 +313,17 @@ public class GameManager : MonoBehaviour
     {
         isRespawning = true;
         currentHealth--;
+
+        // Применяем штраф: списываем 40-50% (по умолчанию 45%) накопленных целительных духов!
+        int lostSpirits = Mathf.RoundToInt(score * soulLossPercentage);
+        score -= lostSpirits;
+        if (score < 0) score = 0;
+
         SaveGameData();
         UpdateHealthUI();
+        UpdateScoreUI();
+
+        Debug.Log($"🏺 [СМЕРТЬ] Игрок погиб! Потеряно {lostSpirits} целей. духов ({soulLossPercentage * 100}%). Осталось: {score}");
 
         if (currentPlayer != null)
         {
@@ -240,12 +346,15 @@ public class GameManager : MonoBehaviour
             if (panicAnim != null) panicAnim.TriggerDie();
         }
 
+        // Восполняем здоровье боссов и мобов до фулла при смерти игрока!
+        HealAllEnemiesToFull();
+
         // Ждем 1 секунду, пока проигрывается анимация смерти
         yield return new WaitForSeconds(1f);
 
         if (currentHealth <= 0)
         {
-            ShowLose(); // Экран смерти (можно убрать потом и сделать бесконечное возрождение)
+            ShowLose(); // Экран смерти (можно убира потом и сделать бесконечное возрождение)
         }
         else
         {
@@ -260,6 +369,35 @@ public class GameManager : MonoBehaviour
         }
         
         isRespawning = false;
+    }
+
+    /// <summary>
+    /// Полностью восстанавливает здоровье всем активным на сцене монстрам и боссам
+    /// </summary>
+    private void HealAllEnemiesToFull()
+    {
+        // 1. Исцеляем до фулла обычных врагов
+        Enemy[] enemies = FindObjectsByType<Enemy>(FindObjectsSortMode.None);
+        foreach (var enemy in enemies)
+        {
+            if (enemy != null) enemy.HealToFull();
+        }
+
+        // 2. Исцеляем до фулла красных боссов
+        Boss[] bosses = FindObjectsByType<Boss>(FindObjectsSortMode.None);
+        foreach (var boss in bosses)
+        {
+            if (boss != null) boss.HealToFull();
+        }
+
+        // 3. Исцеляем до фулла фиолетовых боссов (Bringer of Death)
+        BringerOfDeath[] deathBringers = FindObjectsByType<BringerOfDeath>(FindObjectsSortMode.None);
+        foreach (var db in deathBringers)
+        {
+            if (db != null) db.HealToFull();
+        }
+
+        Debug.Log("🏺 [ДУХИ] Все активные монстры и боссы на карте полностью исцелены после смерти игрока!");
     }
 
     public void WinLevel()
@@ -302,18 +440,45 @@ public class GameManager : MonoBehaviour
         int nextIndex = SceneManager.GetActiveScene().buildIndex + 1;
         if (nextIndex < SceneManager.sceneCountInBuildSettings)
         {
-            SceneManager.LoadScene(nextIndex);
+            if (CelesteTransition.Instance == null)
+            {
+                GameObject manager = new GameObject("CelesteTransitionManager");
+                manager.AddComponent<CelesteTransition>();
+            }
+
+            if (CelesteTransition.Instance != null)
+            {
+                CelesteTransition.Instance.TransitionToScene(nextIndex);
+            }
+            else
+            {
+                SceneManager.LoadScene(nextIndex);
+            }
         }
         else
         {
-            SceneManager.LoadScene("MainMenu");
+            LoadMainMenu();
         }
     }
 
     public void LoadMainMenu()
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene("MainMenu");
+        
+        if (CelesteTransition.Instance == null)
+        {
+            GameObject manager = new GameObject("CelesteTransitionManager");
+            manager.AddComponent<CelesteTransition>();
+        }
+
+        if (CelesteTransition.Instance != null)
+        {
+            CelesteTransition.Instance.TransitionToScene("MainMenu");
+        }
+        else
+        {
+            SceneManager.LoadScene("MainMenu");
+        }
     }
 
     public void QuitGame()
@@ -337,11 +502,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void UpdateScoreUI()
+    public void UpdateScoreUI()
     {
         if (scoreText != null)
         {
-            scoreText.text = "Score: " + score;
+            scoreText.text = $"Spirits: {score} | Potions: {potionsCount}/{maxPotions}";
         }
     }
 
