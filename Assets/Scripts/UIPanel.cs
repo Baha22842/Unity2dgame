@@ -9,7 +9,7 @@ public class UIPanel : MonoBehaviour
     {
         if (scoreDisplay != null && GameManager.Instance != null)
         {
-            scoreDisplay.text = "Score: " + GameManager.Instance.Score;
+            scoreDisplay.text = "🔮 " + GameManager.Instance.Score;
         }
     }
 }

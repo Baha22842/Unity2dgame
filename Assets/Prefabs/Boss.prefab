@@ -207,11 +207,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Boss
   maxHealth: 20
   speed: 1.5
-  spiritOrbPrefab: {fileID: 0}
+  spiritOrbPrefab: {fileID: 7697936945063801582, guid: a29afee2adccfe64391958701d4addc2, type: 3}
   minSpirits: 150
   maxSpirits: 200
-  portalPrefab: {fileID: 0}
-  portalSpawnPoint: {fileID: 0}
+  portalPrefab: {fileID: 6289418443277886576, guid: 32e757f5e8eb6b940bfe57a55a22333e, type: 3}
+  portalSpawnPoint: {fileID: 6164613305687939484}
   attackRange: 2
   attackCooldown: 1.5
   aggroRange: 5
@@ -355,7 +355,7 @@ Transform:
   m_GameObject: {fileID: 8195586898725348217}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.42, y: 1.4, z: 0}
+  m_LocalPosition: {x: 2.92, y: 1.4, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

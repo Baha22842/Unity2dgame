@@ -12,6 +12,10 @@ PrefabInstance:
       propertyPath: abilityToUnlock
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 187823482175548901, guid: 339c3a6d4a46aee4bb813a72f693b0d5, type: 3}
+      propertyPath: pickupEffectPrefab
+      value: 
+      objectReference: {fileID: 4409498503736368454, guid: 778f393241a1b8c41b8800ab16771c7e, type: 3}
     - target: {fileID: 6409971896999538751, guid: 339c3a6d4a46aee4bb813a72f693b0d5, type: 3}
       propertyPath: m_Name
       value: Orb_HeavyAttack Variant

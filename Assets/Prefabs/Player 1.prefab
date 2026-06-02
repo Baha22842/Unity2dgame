@@ -400,7 +400,7 @@ MonoBehaviour:
   attackLayers:
     serializedVersion: 2
     m_Bits: 64
-  thrustAttackLunge: 7
+  thrustAttackLunge: 10
   recoilForceX: 1
   recoilForceY: 1
   globalAttackCooldown: 0.5

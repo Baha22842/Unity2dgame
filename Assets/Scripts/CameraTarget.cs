@@ -79,19 +79,19 @@ public class CameraTarget : MonoBehaviour
                     if (compName.Contains("Follow") || compType.FullName.Contains("Follow"))
                     {
                         PropertyInfo p = compType.GetProperty("Target", flags) ?? compType.GetProperty("Follow", flags);
-                        if (p != null) p.SetValue(component, transform);
+                        if (p != null) { try { p.SetValue(component, transform); } catch { } }
                         
                         FieldInfo f = compType.GetField("Target", flags) ?? compType.GetField("Follow", flags);
-                        if (f != null) f.SetValue(component, transform);
+                        if (f != null) { try { f.SetValue(component, transform); } catch { } }
                     }
                     
                     if (compName.Contains("LookAt") || compName.Contains("Composer") || compType.FullName.Contains("LookAt") || compType.FullName.Contains("Composer"))
                     {
                         PropertyInfo p = compType.GetProperty("LookAtTarget", flags) ?? compType.GetProperty("LookAt", flags);
-                        if (p != null) p.SetValue(component, transform);
+                        if (p != null) { try { p.SetValue(component, transform); } catch { } }
                         
                         FieldInfo f = compType.GetField("LookAtTarget", flags) ?? compType.GetField("LookAt", flags);
-                        if (f != null) f.SetValue(component, transform);
+                        if (f != null) { try { f.SetValue(component, transform); } catch { } }
                     }
                 }
             }

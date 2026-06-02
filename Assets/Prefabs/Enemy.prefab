@@ -282,7 +282,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
   enemyType: 0
   maxHealth: 3
-  attackDamage: 1
+  spiritOrbPrefab: {fileID: 7697936945063801582, guid: a29afee2adccfe64391958701d4addc2, type: 3}
+  minSpirits: 20
+  maxSpirits: 30
   knockbackForce: {x: 0.1, y: 0}
   speed: 1
   chaseSpeed: 1.2

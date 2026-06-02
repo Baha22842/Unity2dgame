@@ -25,12 +25,29 @@ public class PlayerAnimator : MonoBehaviour
     private readonly int isPowerUpHash = Animator.StringToHash("IsPowerUp");
     private readonly int isShieldingHash = Animator.StringToHash("IsShielding");
 
+    private bool hasIsDeadParameter;
+
     private void Awake()
     {
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
         playerMovement = GetComponent<PlayerMovement>();
         playerCombat = GetComponent<PlayerCombat>();
+
+        if (anim != null)
+        {
+            hasIsDeadParameter = HasParameter("IsDead");
+        }
+    }
+
+    private bool HasParameter(string paramName)
+    {
+        if (anim == null) return false;
+        foreach (AnimatorControllerParameter param in anim.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
     }
 
     private void OnEnable()
@@ -63,7 +80,10 @@ public class PlayerAnimator : MonoBehaviour
         bool isPowerUp = playerMovement.CurrentState == PlayerMovement.PlayerState.PowerUp;
 
         // Вместо костылей с "return;" мы просто ставим всем параметрам нужные значения
-        anim.SetBool("IsDead", isDead);
+        if (hasIsDeadParameter)
+        {
+            anim.SetBool("IsDead", isDead);
+        }
         anim.SetBool(isPowerUpHash, isPowerUp);
 
         // Стабилизация анимации бега у стены

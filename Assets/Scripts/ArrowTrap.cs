@@ -10,8 +10,11 @@ public class ArrowTrap : MonoBehaviour
     [Tooltip("Точка, откуда вылетает стрела")]
     [SerializeField] private Transform firePoint;
 
-    [Tooltip("Направление стрельбы")]
+    [Tooltip("Направление стрельбы в локальных координатах (по умолчанию влево, так как спрайт смотрит влево)")]
     [SerializeField] private Vector2 shootDirection = Vector2.left;
+
+    [Tooltip("Использовать поворот (Rotation/Scale) объекта для направления стрельбы? (Рекомендуется, чтобы просто крутить ловушку на сцене)")]
+    [SerializeField] private bool useRotationAsDirection = true;
 
     [Tooltip("Перезарядка между выстрелами")]
     [SerializeField] private float shootCooldown = 2.5f;
@@ -26,11 +29,39 @@ public class ArrowTrap : MonoBehaviour
     private Animator _anim;
     private Transform _player;
     private float _cooldownTimer;
+    private Coroutine _trapCoroutine;
+
+    // Свойство для получения актуального направления стрельбы
+    public Vector2 CurrentShootDirection
+    {
+        get
+        {
+            if (useRotationAsDirection)
+            {
+                // Переводим локальный вектор "влево" (по умолчанию для ловушки) в мировое пространство.
+                // Это автоматически учитывает Z-поворот (rotation) и зеркальное отражение (scale.x = -1) в Unity!
+                return ((Vector2)transform.TransformDirection(Vector3.left)).normalized;
+            }
+            return shootDirection.normalized;
+        }
+    }
+
+    private void Awake()
+    {
+        _anim = GetComponent<Animator>();
+    }
+
+    private void OnEnable()
+    {
+        if (_anim != null)
+        {
+            _anim.speed = 0f; // Приостанавливаем аниматор на старте в закрытом состоянии
+            _anim.Play("PopUpTrap", 0, 0f);
+        }
+    }
 
     private void Start()
     {
-        _anim = GetComponent<Animator>();
-        
         GameObject p = GameObject.FindGameObjectWithTag("Player");
         if (p != null)
         {
@@ -45,7 +76,13 @@ public class ArrowTrap : MonoBehaviour
 
     private void Update()
     {
-        if (_player == null) return;
+        if (_player == null)
+        {
+            // Динамический поиск игрока, если на старте его не было
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) _player = p.transform;
+            else return;
+        }
 
         if (_cooldownTimer > 0f)
         {
@@ -66,7 +103,7 @@ public class ArrowTrap : MonoBehaviour
 
         // Проверяем направление: находится ли игрок в секторе обстрела ловушки
         Vector2 toPlayer = (_player.position - transform.position).normalized;
-        float dotProduct = Vector2.Dot(toPlayer, shootDirection.normalized);
+        float dotProduct = Vector2.Dot(toPlayer, CurrentShootDirection);
 
         // Угол конуса видимости ~90 градусов (dot > 0.7)
         if (dotProduct < 0.7f) return false;
@@ -86,10 +123,40 @@ public class ArrowTrap : MonoBehaviour
     {
         _cooldownTimer = shootCooldown;
 
-        // Запускаем анимацию открытия и выстрела ловушки
+        if (_trapCoroutine != null)
+        {
+            StopCoroutine(_trapCoroutine);
+        }
+        _trapCoroutine = StartCoroutine(PlayTrapRoutine());
+    }
+
+    private System.Collections.IEnumerator PlayTrapRoutine()
+    {
         if (_anim != null)
         {
-            _anim.SetTrigger("Shoot");
+            _anim.speed = 1f;
+            _anim.Play("PopUpTrap", 0, 0f);
+
+            // Ждем один кадр для обновления стейта аниматора
+            yield return null;
+
+            float duration = _anim.GetCurrentAnimatorStateInfo(0).length;
+            if (duration <= 0.05f) duration = 1.0f; // Безопасный дефолт
+
+            yield return new WaitForSeconds(duration);
+
+            // По завершении залпа возвращаем ловушку к первому закрытому кадру и останавливаем
+            _anim.speed = 0f;
+            _anim.Play("PopUpTrap", 0, 0f);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (_trapCoroutine != null)
+        {
+            StopCoroutine(_trapCoroutine);
+            _trapCoroutine = null;
         }
     }
 
@@ -98,6 +165,10 @@ public class ArrowTrap : MonoBehaviour
     /// </summary>
     public void ShootArrow()
     {
+        // Каждая выпущенная стрела обновляет таймер перезарядки.
+        // Это гарантирует, что кулдаун начнется строго после ПОСЛЕДНЕГО выстрела в залпе!
+        _cooldownTimer = shootCooldown;
+
         if (arrowPrefab == null || firePoint == null) return;
 
         // Создаем стрелу в точке вылета без ручного вращения (его сделает сам Projectile)
@@ -107,7 +178,7 @@ public class ArrowTrap : MonoBehaviour
         Projectile proj = arrow.GetComponent<Projectile>();
         if (proj != null)
         {
-            proj.SetDirection(shootDirection);
+            proj.SetDirection(CurrentShootDirection);
         }
         else
         {
@@ -122,13 +193,14 @@ public class ArrowTrap : MonoBehaviour
         // Отрисовка линии стрельбы в редакторе для удобства настройки
         if (firePoint != null)
         {
+            Vector2 dir = CurrentShootDirection;
             Gizmos.color = Color.red;
-            Gizmos.DrawRay(firePoint.position, shootDirection.normalized * detectionRange);
+            Gizmos.DrawRay(firePoint.position, dir * detectionRange);
             
             // Рисуем конус видимости
             Gizmos.color = Color.yellow;
-            Vector3 leftBoundary = Quaternion.Euler(0, 0, 45) * shootDirection.normalized;
-            Vector3 rightBoundary = Quaternion.Euler(0, 0, -45) * shootDirection.normalized;
+            Vector3 leftBoundary = Quaternion.Euler(0, 0, 45) * dir;
+            Vector3 rightBoundary = Quaternion.Euler(0, 0, -45) * dir;
             Gizmos.DrawRay(firePoint.position, leftBoundary * detectionRange);
             Gizmos.DrawRay(firePoint.position, rightBoundary * detectionRange);
         }

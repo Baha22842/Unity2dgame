@@ -26,7 +26,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpForce = 7f;
     [SerializeField] private float doubleJumpForce = 5f;
     [SerializeField] private float jumpBufferTime = 0.15f;
-    [SerializeField] private float coyoteTime = 0.1f;
+    [SerializeField] private float coyoteTime = 0.2f;
 
     [Header("Dash")]
     [SerializeField] private float dashForce = 15f;
@@ -373,12 +373,13 @@ public class PlayerMovement : MonoBehaviour
         if (_ladderCooldownTimer > 0f) _ladderCooldownTimer -= Time.deltaTime;
         if (_ledgeGrabCooldownTimer > 0f) _ledgeGrabCooldownTimer -= Time.deltaTime;
 
-        if (_isGrounded)
+        bool resetJumps = _isGrounded || IsPhysicallyOnPlatform() || CurrentState == PlayerState.LedgeGrab || CurrentState == PlayerState.LedgeClimb;
+        if (resetJumps)
         {
             _coyoteTimer = coyoteTime;
             _remainingJumps = (GameManager.Instance != null && GameManager.Instance.hasDoubleJump) ? 1 : 0;
             _isRollFalling = false;
-            _canDashInAir = true; // Сбрасываем рывок только при касании земли
+            _canDashInAir = true; // Сбрасываем рывок только при касании земли или уступа
             _isDoubleJumping = false;
         }
         else
@@ -631,6 +632,19 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private bool IsPhysicallyOnPlatform()
+    {
+        if (groundCheckPoint == null) return false;
+
+        // Используем более широкую зону проверки (95% от исходной), чтобы определить,
+        // находится ли физически край коллайдера персонажа на платформе.
+        Vector2 widerCheckSize = new Vector2(groundCheckSize.x * 0.95f, groundCheckSize.y);
+        bool isSupported = Physics2D.OverlapBox(groundCheckPoint.position, widerCheckSize, 0f, groundLayer);
+
+        // Мы считаем персонажа на платформе, если он поддерживается землёй и не движется вертикально (стоит/бежит на краю)
+        return isSupported && Mathf.Abs(rb.linearVelocity.y) < 0.05f;
+    }
+
     private void CheckLedge()
     {
         if (_ledgeGrabCooldownTimer > 0f) return;
@@ -830,9 +844,35 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        CheckHazardCollision(collision.collider);
+    }
+
     private void OnTriggerEnter2D(Collider2D collider)
     {
         if (collider.CompareTag("Ladder")) _isNearLadder = true;
+        CheckHazardCollision(collider);
+    }
+
+    private void CheckHazardCollision(Collider2D otherCollider)
+    {
+        if (otherCollider == null) return;
+
+        string name = otherCollider.gameObject.name.ToLower();
+        bool isHazard = name.Contains("spike")
+                     || name.Contains("trap")
+                     || name.Contains("hazard")
+                     || otherCollider.GetComponent<SpikeTrap>() != null
+                     || otherCollider.GetComponent<Trap>() != null;
+
+        if (isHazard)
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.PlayerDied();
+            }
+        }
     }
 
     private void OnTriggerExit2D(Collider2D collider)

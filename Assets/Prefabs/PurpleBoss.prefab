@@ -197,7 +197,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BringerOfDeath
   maxHealth: 15
   speed: 2
-  spiritOrbPrefab: {fileID: 0}
+  spiritOrbPrefab: {fileID: 7697936945063801582, guid: a29afee2adccfe64391958701d4addc2, type: 3}
   minSpirits: 150
   maxSpirits: 200
   meleeRange: 2

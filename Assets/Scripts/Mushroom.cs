@@ -42,6 +42,10 @@ public class Mushroom : MonoBehaviour, IHittable
     [SerializeField] private float _peekDuration = 1.5f;
     [SerializeField] private float _popDuration = 0.5f;
 
+    [Header("Visual Settings")]
+    [Tooltip("Смещение по Y для визуального выравнивания спрайта относительно земли в инспекторе")]
+    [SerializeField] private float _spriteVisualYOffset = 0f;
+
     // Константы имен анимаций, соответствующих файлам в Assets/Animations
     private const string ANIM_IDLE = "ShoomIdle";
     private const string ANIM_WALK = "ShoomWalk";
@@ -59,12 +63,19 @@ public class Mushroom : MonoBehaviour, IHittable
     private Rigidbody2D _rb;
     private Animator _animator;
     private Collider2D _collider;
+    private SpriteRenderer _spriteRenderer;
+    private SpriteRenderer _visualSpriteRenderer;
+    private Vector3 _originalSpriteLocalPosition;
+    private float _groundLocalY;
+    private float _initialPivotY;
+    private float _ppu = 16f;
 
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
         _animator = GetComponent<Animator>();
         _collider = GetComponent<Collider2D>();
+        _spriteRenderer = GetComponent<SpriteRenderer>();
 
         if (_animator != null)
         {
@@ -103,6 +114,50 @@ public class Mushroom : MonoBehaviour, IHittable
             }
         }
 
+        _groundLocalY = _originalColliderOffset.y - (_originalColliderSize.y / 2f);
+
+        // Если оригинальный SpriteRenderer находится на самом объекте гриба,
+        // мы создаем дочерний объект для визуализации. Это позволяет смещать спрайт
+        // для компенсации разницы пивотов при анимации сжатия без изменения позиции
+        // самого объекта (что ломало физику и телепортировало гриб).
+        if (_spriteRenderer != null)
+        {
+            if (_spriteRenderer.sprite != null)
+            {
+                _initialPivotY = _spriteRenderer.sprite.pivot.y;
+                _ppu = _spriteRenderer.sprite.pixelsPerUnit;
+            }
+            else
+            {
+                _initialPivotY = 0f;
+                _ppu = 16f;
+            }
+
+            GameObject visualObj = new GameObject("Mushroom_Visual");
+            visualObj.transform.SetParent(transform);
+            visualObj.transform.localPosition = Vector3.zero;
+            visualObj.transform.localRotation = Quaternion.identity;
+            visualObj.transform.localScale = Vector3.one;
+
+            _visualSpriteRenderer = visualObj.AddComponent<SpriteRenderer>();
+            _visualSpriteRenderer.color = _spriteRenderer.color;
+            _visualSpriteRenderer.material = _spriteRenderer.material;
+            _visualSpriteRenderer.sortingLayerID = _spriteRenderer.sortingLayerID;
+            _visualSpriteRenderer.sortingOrder = _spriteRenderer.sortingOrder;
+            _visualSpriteRenderer.renderingLayerMask = _spriteRenderer.renderingLayerMask;
+            _visualSpriteRenderer.spriteSortPoint = _spriteRenderer.spriteSortPoint;
+
+            // Отключаем оригинальный рендерер, чтобы он не отрисовывал гриб повторно.
+            // При этом аниматор продолжит обновлять поле sprite на нём, и мы будем копировать его.
+            _spriteRenderer.enabled = false;
+
+            _originalSpriteLocalPosition = Vector3.zero;
+        }
+        else
+        {
+            _originalSpriteLocalPosition = Vector3.zero;
+        }
+
         // Задаем изначальное направление взгляда по scale.x
         _facingDirection = (transform.localScale.x >= 0f) ? 1 : -1;
     }
@@ -118,6 +173,40 @@ public class Mushroom : MonoBehaviour, IHittable
     private void Update()
     {
         UpdateStateLogic();
+    }
+
+    private void LateUpdate()
+    {
+        if (_visualSpriteRenderer != null && _spriteRenderer != null)
+        {
+            _visualSpriteRenderer.sprite = _spriteRenderer.sprite;
+            _visualSpriteRenderer.color = _spriteRenderer.color;
+            _visualSpriteRenderer.flipX = _spriteRenderer.flipX;
+            _visualSpriteRenderer.flipY = _spriteRenderer.flipY;
+        }
+
+        AlignSpriteWithGround();
+    }
+
+    private void AlignSpriteWithGround()
+    {
+        if (_visualSpriteRenderer != null && _visualSpriteRenderer.sprite != null)
+        {
+            Sprite currentSprite = _visualSpriteRenderer.sprite;
+            float localPivotY = currentSprite.pivot.y;
+            float ppu = currentSprite.pixelsPerUnit;
+            
+            // Сдвигаем спрайт на разницу пивотов текущего кадра и исходного кадра.
+            // Это оставляет спрайт ровно на земле в Walk/Idle (смещение = 0)
+            // и автоматически компенсирует сжатие в Hide/Peek/Pop без левитации.
+            float targetLocalY = ((localPivotY - _initialPivotY) / ppu) + _spriteVisualYOffset;
+            
+            _visualSpriteRenderer.transform.localPosition = new Vector3(
+                _originalSpriteLocalPosition.x,
+                targetLocalY,
+                _originalSpriteLocalPosition.z
+            );
+        }
     }
 
     private void FixedUpdate()

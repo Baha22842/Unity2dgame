@@ -7,6 +7,8 @@ public class BatEnemy : MonoBehaviour, IHittable
     [Header("Характеристики летучей мыши")]
     [SerializeField] private int maxHealth = 2;
     [SerializeField] private float speed = 3f;
+    [Tooltip("Скорость преследования игрока (погони)")]
+    [SerializeField] private float chaseSpeed = 2f;
 
     [Header("Аггро и Зона привязки (Tether Zone)")]
     [SerializeField] private float aggroRange = 8f;
@@ -26,6 +28,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     [SerializeField] private float attackCooldown = 2f;
     [SerializeField] private float attackDuration = 0.5f;
     [SerializeField] private LayerMask playerLayer;
+    [SerializeField] private LayerMask groundLayer = 1 << 7;
 
     [Header("Настройки Спрайта")]
     [Tooltip("Спрайт по умолчанию смотрит вправо? (Если нарисован смотрящим влево, сними галочку)")]
@@ -40,7 +43,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     [SerializeField] private float patrolWaitTime = 1.2f;
 
     [Header("Настройки Отбрасывания (Knockback)")]
-    [SerializeField] private Vector2 knockbackForce = new Vector2(3f, 3f);
+    [SerializeField] private Vector2 knockbackForce = new Vector2(6f, 2f);
 
     private int _currentHealth;
     private bool _isDead = false;
@@ -48,6 +51,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     private float _cooldownTimer = 0f;
     private int _facingDirection = 1; // 1 = Вправо, -1 = Влево
     private Vector2 _startPosition; // Стартовая точка спавна
+    private float _hitStunTimer = 0f;
 
     // Состояние патруля
     private int _patrolDirection = 1; // 1 = Вправо, -1 = Влево
@@ -73,6 +77,14 @@ public class BatEnemy : MonoBehaviour, IHittable
         _rb.gravityScale = 0f;
         _rb.freezeRotation = true;
 
+        // Назначаем материал без трения, чтобы избежать застревания/прилипания к стенам
+        PhysicsMaterial2D frictionless = new PhysicsMaterial2D("FrictionlessBat") { friction = 0f, bounciness = 0f };
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        foreach (var col in colliders)
+        {
+            col.sharedMaterial = frictionless;
+        }
+
         // Инициализируем направление взгляда на старте
         _facingDirection = 1;
     }
@@ -93,6 +105,12 @@ public class BatEnemy : MonoBehaviour, IHittable
     private void Update()
     {
         if (_isDead) return;
+
+        if (_hitStunTimer > 0f)
+        {
+            _hitStunTimer -= Time.deltaTime;
+            return;
+        }
 
         if (_cooldownTimer > 0f) _cooldownTimer -= Time.deltaTime;
 
@@ -131,7 +149,7 @@ public class BatEnemy : MonoBehaviour, IHittable
             {
                 // Преследуем по воздуху
                 Vector2 flyDirection = ((Vector2)_playerTransform.position - (Vector2)transform.position).normalized;
-                _rb.linearVelocity = flyDirection * speed;
+                _rb.linearVelocity = AdjustVelocityForObstacles(flyDirection * chaseSpeed);
             }
         }
         else
@@ -150,7 +168,7 @@ public class BatEnemy : MonoBehaviour, IHittable
                     Vector2 returnDirection = (_startPosition - (Vector2)transform.position).normalized;
                     // Красивое волнообразное покачивание при полете назад
                     float bobbing = Mathf.Sin(Time.time * 6f) * 0.4f;
-                    _rb.linearVelocity = new Vector2(returnDirection.x * speed, returnDirection.y * speed + bobbing);
+                    _rb.linearVelocity = AdjustVelocityForObstacles(new Vector2(returnDirection.x * speed, returnDirection.y * speed + bobbing));
 
                     // Поворачиваемся лицом к цели полета
                     float dirToTarget = Mathf.Sign(returnDirection.x);
@@ -199,7 +217,7 @@ public class BatEnemy : MonoBehaviour, IHittable
                         // Летим в направлении патрулирования
                         float patrolSpeed = speed * patrolSpeedMultiplier;
                         float bobbing = Mathf.Sin(Time.time * 6f) * 0.4f;
-                        _rb.linearVelocity = new Vector2(_patrolDirection * patrolSpeed, bobbing);
+                        _rb.linearVelocity = AdjustVelocityForObstacles(new Vector2(_patrolDirection * patrolSpeed, bobbing));
 
                         // Поворачиваем спрайт по направлению полета
                         if (_patrolDirection != _facingDirection)
@@ -287,6 +305,7 @@ public class BatEnemy : MonoBehaviour, IHittable
             {
                 float knockbackDir = Mathf.Sign(transform.position.x - _playerTransform.position.x);
                 _rb.linearVelocity = new Vector2(knockbackDir * knockbackForce.x, knockbackForce.y);
+                _hitStunTimer = 0.25f; // Оглушение на 0.25 сек, чтобы дать мыши отлететь назад
             }
             StartCoroutine(FlashRed());
         }
@@ -384,4 +403,97 @@ public class BatEnemy : MonoBehaviour, IHittable
         if (attackPoint == null) attackPoint = transform.Find("AttackPoint");
     }
     #endif
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        IgnoreHazardCollision(collision.collider);
+    }
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        IgnoreHazardCollision(collision.collider);
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        IgnoreHazardCollision(other);
+    }
+
+    private void IgnoreHazardCollision(Collider2D otherCollider)
+    {
+        if (otherCollider == null) return;
+
+        string name = otherCollider.gameObject.name.ToLower();
+        bool isSpikes = otherCollider.GetComponent<SpikeTrap>() != null 
+                     || name.Contains("spike") 
+                     || name.Contains("trap");
+                     
+        bool isLadder = otherCollider.CompareTag("Ladder") 
+                     || name.Contains("ladder");
+
+        if (isSpikes || isLadder)
+        {
+            Collider2D[] myColliders = GetComponents<Collider2D>();
+            foreach (var myCol in myColliders)
+            {
+                if (myCol.enabled && otherCollider.enabled)
+                {
+                    Physics2D.IgnoreCollision(myCol, otherCollider, true);
+                }
+            }
+        }
+    }
+
+    private Vector2 AdjustVelocityForObstacles(Vector2 desiredVelocity)
+    {
+        if (desiredVelocity.magnitude < 0.05f) return desiredVelocity;
+
+        Vector2 direction = desiredVelocity.normalized;
+        float currentSpeed = desiredVelocity.magnitude;
+        float radius = 0.4f; // Approximate radius of the bat
+        float checkDistance = 0.6f; // Lookahead distance
+
+        RaycastHit2D hit = Physics2D.CircleCast(transform.position, radius, direction, checkDistance, groundLayer);
+        if (hit.collider != null && hit.collider.gameObject != gameObject)
+        {
+            Vector2 normal = hit.normal;
+            
+            // Project flight vector onto surface tangent plane (sliding)
+            Vector2 slideDirection = direction - Vector2.Dot(direction, normal) * normal;
+            
+            if (slideDirection.magnitude > 0.05f)
+            {
+                return slideDirection.normalized * currentSpeed;
+            }
+            else
+            {
+                // Perpendicular collision (e.g., straight into wall/ceiling).
+                // Determine tangent vector and pick the option that moves closer to target.
+                Vector2 tangent = new Vector2(-normal.y, normal.x);
+                Vector2 option1 = tangent;
+                Vector2 option2 = -tangent;
+                
+                Vector2 targetDir = direction;
+                if (_playerTransform != null && Vector2.Distance(transform.position, _playerTransform.position) < aggroRange)
+                {
+                    targetDir = ((Vector2)_playerTransform.position - (Vector2)transform.position).normalized;
+                }
+                else if (_isReturning)
+                {
+                    targetDir = (_startPosition - (Vector2)transform.position).normalized;
+                }
+
+                if (Vector2.Dot(option1, targetDir) >= Vector2.Dot(option2, targetDir))
+                {
+                    return option1.normalized * currentSpeed;
+                }
+                else
+                {
+                    return option2.normalized * currentSpeed;
+                }
+            }
+        }
+
+        return desiredVelocity;
+    }
 }

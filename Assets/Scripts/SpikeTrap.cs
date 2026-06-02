@@ -6,11 +6,14 @@ public class SpikeTrap : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
-            if (pm != null)
+            if (GameManager.Instance != null)
             {
-                // Прямой урон через PlayerMovement, который вызовет knockback и инвул
-                pm.TakeDamage(transform.position);
+                GameManager.Instance.PlayerDied();
+            }
+            else
+            {
+                PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+                if (pm != null) pm.TakeDamage(transform.position);
             }
         }
     }
@@ -19,10 +22,14 @@ public class SpikeTrap : MonoBehaviour
     {
         if (collider.CompareTag("Player"))
         {
-            PlayerMovement pm = collider.GetComponent<PlayerMovement>();
-            if (pm != null)
+            if (GameManager.Instance != null)
             {
-                pm.TakeDamage(transform.position);
+                GameManager.Instance.PlayerDied();
+            }
+            else
+            {
+                PlayerMovement pm = collider.GetComponent<PlayerMovement>();
+                if (pm != null) pm.TakeDamage(transform.position);
             }
         }
     }

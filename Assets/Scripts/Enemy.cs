@@ -461,11 +461,26 @@ public class Enemy : MonoBehaviour
             if (player != null)
             {
                 float knockbackDir = Mathf.Sign(transform.position.x - player.position.x);
-                _rb.linearVelocity = new Vector2(knockbackDir * knockbackForce.x, knockbackForce.y);
+                Vector2 actualKnockback = IsGolem() ? new Vector2(0.2f, 0f) : knockbackForce;
+                _rb.linearVelocity = new Vector2(knockbackDir * actualKnockback.x, actualKnockback.y);
             }
 
             ChangeState(EnemyState.Hit);
         }
+    }
+
+    private bool IsGolem()
+    {
+        if (gameObject.name.ToLower().Contains("golem") || gameObject.name.ToLower().Contains("golum"))
+            return true;
+
+        if (_animator != null && _animator.runtimeAnimatorController != null)
+        {
+            if (_animator.runtimeAnimatorController.name.ToLower().Contains("golem"))
+                return true;
+        }
+
+        return false;
     }
 
     private void PlayAnim(string stateName)

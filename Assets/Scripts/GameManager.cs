@@ -63,7 +63,9 @@ public class GameManager : MonoBehaviour
     public GameObject playerPrefab;
 
     [Header("UI")]
-    public Text scoreText;
+    public Text scoreText; // Старый совмещенный текст (для обратной совместимости)
+    public TMPro.TextMeshProUGUI soulsText; // Отдельный текст для душ (поместите рядом с иконкой душ)
+    public TMPro.TextMeshProUGUI potionsText; // Отдельный текст для зелий (поместите рядом с иконкой зелий)
     public GameObject[] healthPoints; // Массив квадратиков здоровья (вместо текста)
     
     [Header("Heart Animation Settings")]
@@ -88,12 +90,14 @@ public class GameManager : MonoBehaviour
     public System.Collections.Generic.List<string> exploredRooms = new System.Collections.Generic.List<string>();
 
     [Header("Gameplay (Здоровье)")]
-    public int maxHealth = 5;
+    public int maxHealth = 3;
 
     private int score;
     private int currentHealth;
     private GameObject currentPlayer;
     private float totalPlayTime = 0f;
+    private Vector3 lastSafePosition;
+    private CanvasGroup fadeCanvasGroup;
 
     public int Score => score;
     public int CurrentHealth => currentHealth;
@@ -124,11 +128,20 @@ public class GameManager : MonoBehaviour
             losePanel.SetActive(false);
         }
 
+        CreateFadeCanvas();
+
         // Загружаем данные с жесткого диска вместо статических переменных
         SaveData data = SaveSystem.LoadGame(SaveSystem.SelectedSlot);
         if (data != null)
         {
             score = data.score;
+            
+            // Загружаем максимальное здоровье, если оно сохранено
+            if (data.maxHealth > 0)
+            {
+                maxHealth = data.maxHealth;
+            }
+            
             currentHealth = data.lives; // в старых сохранениях это lives
             if (currentHealth <= 0) currentHealth = maxHealth; // защита от бага при загрузке мертвого перса
 
@@ -181,6 +194,23 @@ public class GameManager : MonoBehaviour
         {
             totalPlayTime += Time.deltaTime;
         }
+
+        UpdateLastSafePosition();
+    }
+
+    private void UpdateLastSafePosition()
+    {
+        if (currentPlayer == null) return;
+
+        PlayerMovement pm = currentPlayer.GetComponent<PlayerMovement>();
+        if (pm != null && pm.IsGrounded && (pm.CurrentState == PlayerMovement.PlayerState.Idle || pm.CurrentState == PlayerMovement.PlayerState.Run))
+        {
+            Rigidbody2D rb = currentPlayer.GetComponent<Rigidbody2D>();
+            if (rb != null && Mathf.Abs(rb.linearVelocity.y) < 0.05f)
+            {
+                lastSafePosition = currentPlayer.transform.position;
+            }
+        }
     }
 
     private void SpawnPlayer()
@@ -191,6 +221,21 @@ public class GameManager : MonoBehaviour
         }
 
         currentPlayer = Instantiate(playerPrefab, playerSpawnPoint.position, Quaternion.identity);
+
+        if (playerSpawnPoint != null)
+        {
+            lastSafePosition = playerSpawnPoint.position;
+        }
+    }
+
+    private void SpawnPlayerAtPosition(Vector3 position)
+    {
+        if (currentPlayer != null)
+        {
+            Destroy(currentPlayer);
+        }
+
+        currentPlayer = Instantiate(playerPrefab, position, Quaternion.identity);
     }
 
     public void AddScore(int amount)
@@ -240,8 +285,9 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.SetInt(potionsKey, potionsCount);
             PlayerPrefs.Save();
 
-            Heal(maxHealth); // Полное исцеление при использовании зелья
-            Debug.Log($"🏺 [ЗЕЛЬЕ] Зелье использовано! Здоровье восстановлено до максимума. Зелий осталось: {potionsCount}");
+            Heal(1); // Восстанавливаем только 1 ХП (одно сердечко) вместо полного здоровья
+            UpdateScoreUI(); // Немедленно обновляем HUD зелий
+            Debug.Log($"🏺 [ЗЕЛЬЕ] Зелье использовано! Восстановлено 1 ХП. Зелий осталось: {potionsCount}");
         }
     }
 
@@ -314,16 +360,22 @@ public class GameManager : MonoBehaviour
         isRespawning = true;
         currentHealth--;
 
-        // Применяем штраф: списываем 40-50% (по умолчанию 45%) накопленных целительных духов!
-        int lostSpirits = Mathf.RoundToInt(score * soulLossPercentage);
-        score -= lostSpirits;
-        if (score < 0) score = 0;
+        // Применяем штраф списания духов только при окончательной потере всех жизней (Game Over)
+        if (currentHealth <= 0)
+        {
+            int lostSpirits = Mathf.RoundToInt(score * soulLossPercentage);
+            score -= lostSpirits;
+            if (score < 0) score = 0;
+            Debug.Log($"🏺 [ПОЛНАЯ СМЕРТЬ] Игрок потерял все жизни! Потеряно {lostSpirits} целей. духов ({soulLossPercentage * 100}%).");
+        }
+        else
+        {
+            Debug.Log($"🏺 [УРОН] Игрок потерял 1 жизнь. Осталось жизней: {currentHealth}.");
+        }
 
         SaveGameData();
         UpdateHealthUI();
         UpdateScoreUI();
-
-        Debug.Log($"🏺 [СМЕРТЬ] Игрок погиб! Потеряно {lostSpirits} целей. духов ({soulLossPercentage * 100}%). Осталось: {score}");
 
         if (currentPlayer != null)
         {
@@ -349,16 +401,23 @@ public class GameManager : MonoBehaviour
         // Восполняем здоровье боссов и мобов до фулла при смерти игрока!
         HealAllEnemiesToFull();
 
-        // Ждем 1 секунду, пока проигрывается анимация смерти
-        yield return new WaitForSeconds(1f);
+        // 1. Затемнение экрана начинается МГНОВЕННО после смерти (длится 0.8 сек для плавности)
+        yield return StartCoroutine(FadeRoutine(0f, 1f, 0.8f));
+
+        // 2. Ждем задержку в 2.0 секунды на полностью черном экране
+        yield return new WaitForSeconds(2.0f);
 
         if (currentHealth <= 0)
         {
-            ShowLose(); // Экран смерти (можно убира потом и сделать бесконечное возрождение)
+            ShowLose(); // Экран смерти
         }
         else
         {
-            if (playerSpawnPoint != null && playerPrefab != null)
+            if (lastSafePosition != Vector3.zero)
+            {
+                SpawnPlayerAtPosition(lastSafePosition);
+            }
+            else if (playerSpawnPoint != null && playerPrefab != null)
             {
                 SpawnPlayer();
             }
@@ -366,7 +425,13 @@ public class GameManager : MonoBehaviour
             {
                 RestartLevel();
             }
+
+            // Ждем 0.3 секунды в полной темноте для стабилизации камеры
+            yield return new WaitForSeconds(0.3f);
         }
+
+        // 3. Плавно возвращаем экран из черного (0.8 сек для плавности)
+        yield return StartCoroutine(FadeRoutine(1f, 0f, 0.8f));
         
         isRespawning = false;
     }
@@ -506,7 +571,17 @@ public class GameManager : MonoBehaviour
     {
         if (scoreText != null)
         {
-            scoreText.text = $"Spirits: {score} | Potions: {potionsCount}/{maxPotions}";
+            scoreText.text = $"🔮 {score}    🧪 {potionsCount}/{maxPotions}";
+        }
+
+        if (soulsText != null)
+        {
+            soulsText.text = score.ToString();
+        }
+
+        if (potionsText != null)
+        {
+            potionsText.text = $"{potionsCount}/{maxPotions}";
         }
     }
 
@@ -678,6 +753,52 @@ public class GameManager : MonoBehaviour
                 artifactIcons[i].SetActive(false); // Ключ пока не найден (или скрыт)
             }
         }
+    }
+
+    private void CreateFadeCanvas()
+    {
+        // Создаем Canvas для затемнения при смерти
+        GameObject canvasGo = new GameObject("DeathFadeCanvas");
+        Canvas canvas = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 998;
+        
+        CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        
+        // Создаем черную панель на весь экран
+        GameObject panelGo = new GameObject("DeathFadePanel");
+        panelGo.transform.SetParent(canvasGo.transform, false);
+        
+        RectTransform rect = panelGo.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.sizeDelta = Vector2.zero;
+        
+        Image img = panelGo.AddComponent<Image>();
+        img.color = Color.black;
+        
+        fadeCanvasGroup = panelGo.AddComponent<CanvasGroup>();
+        fadeCanvasGroup.alpha = 0f;
+        fadeCanvasGroup.blocksRaycasts = false;
+        
+        DontDestroyOnLoad(canvasGo);
+    }
+
+    private System.Collections.IEnumerator FadeRoutine(float startAlpha, float endAlpha, float duration)
+    {
+        if (fadeCanvasGroup == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            fadeCanvasGroup.alpha = Mathf.SmoothStep(startAlpha, endAlpha, t);
+            yield return null;
+        }
+        fadeCanvasGroup.alpha = endAlpha;
     }
 }
 
