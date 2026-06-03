@@ -141,6 +141,10 @@ public class GameManager : MonoBehaviour
             {
                 maxHealth = data.maxHealth;
             }
+            else
+            {
+                maxHealth = 3;
+            }
             
             currentHealth = data.lives; // в старых сохранениях это lives
             if (currentHealth <= 0) currentHealth = maxHealth; // защита от бага при загрузке мертвого перса
@@ -161,6 +165,7 @@ public class GameManager : MonoBehaviour
         else
         {
             score = 0;
+            maxHealth = 3; // Всегда начинаем новую игру с 3 сердцами
             currentHealth = maxHealth;
             hasDoubleJump = false;
             hasDash = false;
