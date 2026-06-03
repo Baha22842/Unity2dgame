@@ -312,7 +312,6 @@ public class GameManager : MonoBehaviour
         currentHealth = maxHealth;
         SaveGameData();
         
-        _visualHealth = -1;
         UpdateHealthUI();
         
         Debug.Log($"💖 [МАКС ХП] Максимальное здоровье увеличено на {amount}! Текущее макс ХП: {maxHealth}");
@@ -597,6 +596,18 @@ public class GameManager : MonoBehaviour
     {
         if (healthPoints == null) return;
 
+        // Обновляем видимость фоновых пустых сердечек (ячеек)
+        UpdateBackgroundHeartsVisibility();
+
+        // Ограничиваем активные элементы здоровья на основе maxHealth
+        for (int i = 0; i < healthPoints.Length; i++)
+        {
+            if (healthPoints[i] != null && i >= maxHealth)
+            {
+                healthPoints[i].SetActive(false);
+            }
+        }
+
         // Если это первый запуск (или после смерти/загрузки), мгновенно выставляем нужное здоровье без каскадной задержки
         if (_visualHealth == -1)
         {
@@ -618,9 +629,20 @@ public class GameManager : MonoBehaviour
 
     private void InstantUpdateHealthUI()
     {
+        // Обновляем видимость фоновых ячеек
+        UpdateBackgroundHeartsVisibility();
+
         for (int i = 0; i < healthPoints.Length; i++)
         {
             if (healthPoints[i] == null) continue;
+
+            // Если индекс превышает максимальное здоровье, принудительно гасим и прячем сердце
+            if (i >= maxHealth)
+            {
+                healthPoints[i].SetActive(false);
+                continue;
+            }
+
             Animator anim = healthPoints[i].GetComponent<Animator>();
 
             if (i < _visualHealth)
@@ -636,7 +658,7 @@ public class GameManager : MonoBehaviour
 
                 if (anim != null)
                 {
-                    if (!string.IsNullOrEmpty(heartResetTrigger)) anim.SetTrigger(heartResetTrigger);
+                    if (!string.IsNullOrEmpty(heartResetTrigger)) anim.ResetTrigger(heartResetTrigger);
                     if (!string.IsNullOrEmpty(heartBreakTrigger)) anim.ResetTrigger(heartBreakTrigger);
                 }
             }
@@ -739,6 +761,41 @@ public class GameManager : MonoBehaviour
         if (_heartCoroutines != null && index < _heartCoroutines.Length)
         {
             _heartCoroutines[index] = null;
+        }
+    }
+
+    private void UpdateBackgroundHeartsVisibility()
+    {
+        Transform bgTransform = null;
+
+        // Попытка найти через иерархию относительно активных сердечек (работает даже если выключено)
+        if (healthPoints != null && healthPoints.Length > 0 && healthPoints[0] != null)
+        {
+            Transform healthBarTrans = healthPoints[0].transform.parent;
+            if (healthBarTrans != null && healthBarTrans.parent != null)
+            {
+                bgTransform = healthBarTrans.parent.Find("HealthBar_Background");
+            }
+        }
+
+        // Резервный поиск через GameObject.Find
+        if (bgTransform == null)
+        {
+            GameObject bgGo = GameObject.Find("HealthBar_Background");
+            if (bgGo != null) bgTransform = bgGo.transform;
+        }
+
+        if (bgTransform != null)
+        {
+            int childCount = bgTransform.childCount;
+            for (int i = 0; i < childCount; i++)
+            {
+                Transform child = bgTransform.GetChild(i);
+                if (child != null)
+                {
+                    child.gameObject.SetActive(i < maxHealth);
+                }
+            }
         }
     }
 

@@ -155117,7 +155117,7 @@ Transform:
   m_GameObject: {fileID: 1164195461}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -48.34, y: 0.08, z: 0}
+  m_LocalPosition: {x: 46.05, y: -46.23, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -156441,11 +156441,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db448364c873a0540b66bd09e2263852, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  hasDoubleJump: 1
-  hasDash: 1
-  hasHeavyAttack: 1
-  hasThrust: 1
-  potionsCount: 1
+  hasDoubleJump: 0
+  hasDash: 0
+  hasHeavyAttack: 0
+  hasThrust: 0
+  potionsCount: 0
   maxPotions: 3
   coinCraftCost: 100
   autoCraftPotionWithCoins: 1
