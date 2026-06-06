@@ -52,6 +52,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     private int _facingDirection = 1; // 1 = Вправо, -1 = Влево
     private Vector2 _startPosition; // Стартовая точка спавна
     private float _hitStunTimer = 0f;
+    private bool _damageDealtThisAttack = false;
 
     // Состояние патруля
     private int _patrolDirection = 1; // 1 = Вправо, -1 = Влево
@@ -245,13 +246,23 @@ public class BatEnemy : MonoBehaviour, IHittable
     private IEnumerator AttackRoutine()
     {
         _isAttacking = true;
+        _damageDealtThisAttack = false;
         _rb.linearVelocity = Vector2.zero;
 
         // Запуск анимации атаки
         PlayAnim("BatAttack");
 
-        // Ждем длительность анимации атаки
-        yield return new WaitForSeconds(attackDuration);
+        // Ждем половину длительности анимации перед нанесением урона по таймингу (на случай отсутствия Animation Event)
+        float halfDuration = attackDuration * 0.5f;
+        yield return new WaitForSeconds(halfDuration);
+
+        if (!_damageDealtThisAttack)
+        {
+            TriggerAttackHitbox();
+        }
+
+        // Ждем вторую половину
+        yield return new WaitForSeconds(halfDuration);
 
         _isAttacking = false;
         _cooldownTimer = attackCooldown;
@@ -262,6 +273,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     public void TriggerAttackHitbox()
     {
         if (_isDead) return;
+        if (_damageDealtThisAttack) return;
 
         Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
         Collider2D playerCol = Physics2D.OverlapCircle(checkPos, attackRadius, playerLayer);
@@ -271,8 +283,9 @@ public class BatEnemy : MonoBehaviour, IHittable
             PlayerMovement pm = playerCol.GetComponent<PlayerMovement>();
             if (pm != null)
             {
+                _damageDealtThisAttack = true;
                 pm.TakeDamage(transform.position);
-                Debug.Log("[BAT] Урон звуковой волной из анимации успешно нанесен игроку!");
+                Debug.Log("[BAT] Урон успешно нанесен игроку!");
             }
         }
     }
