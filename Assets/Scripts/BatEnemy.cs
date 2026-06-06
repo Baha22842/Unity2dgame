@@ -141,7 +141,10 @@ public class BatEnemy : MonoBehaviour, IHittable
                 SetFacingDirection((int)dirToPlayer);
             }
 
-            if (distanceToPlayer <= attackRange && _cooldownTimer <= 0f)
+            Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
+            bool isPlayerInStrikeZone = Physics2D.OverlapCircle(checkPos, attackRadius, playerLayer) != null;
+
+            if (isPlayerInStrikeZone && _cooldownTimer <= 0f)
             {
                 StartCoroutine(AttackRoutine());
             }
@@ -279,6 +282,14 @@ public class BatEnemy : MonoBehaviour, IHittable
             // Это самый простой, стандартный и надежный способ для 2D-спрайтов,
             // который никогда не конфликтует с физикой Rigidbody2D или масштабом Animator!
             _spriteRenderer.flipX = faceRightByDefault ? (_facingDirection == -1) : (_facingDirection == 1);
+        }
+
+        // Зеркалируем локальное положение attackPoint по оси X, чтобы хитбокс следовал за направлением мыши
+        if (attackPoint != null)
+        {
+            Vector3 localPos = attackPoint.localPosition;
+            localPos.x = Mathf.Abs(localPos.x) * _facingDirection;
+            attackPoint.localPosition = localPos;
         }
     }
 
