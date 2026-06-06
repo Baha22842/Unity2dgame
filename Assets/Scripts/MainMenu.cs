@@ -168,7 +168,7 @@ public class MainMenu : MonoBehaviour
                 if (data != null)
                 {
                     if (slotCoinsTexts != null && i < slotCoinsTexts.Length && slotCoinsTexts[i] != null)
-                        slotCoinsTexts[i].text = data.score.ToString() + " монет";
+                        slotCoinsTexts[i].text = data.score.ToString() + " душ";
                     
                     if (slotTimeTexts != null && i < slotTimeTexts.Length && slotTimeTexts[i] != null)
                         slotTimeTexts[i].text = FormatTime(data.totalPlayTime);
@@ -220,6 +220,7 @@ public class MainMenu : MonoBehaviour
         PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
         PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
         PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedPotions");
         PlayerPrefs.Save();
         UpdateSaveSlotsUI();
     }

@@ -212,6 +212,7 @@ public class PlayerCombat : MonoBehaviour
 
         Collider2D[] hits = Physics2D.OverlapCircleAll(attackPoint.position, attackRadius, attackLayers);
         bool hasHitSomething = false;
+        System.Collections.Generic.HashSet<GameObject> damagedParents = new System.Collections.Generic.HashSet<GameObject>();
 
         foreach (Collider2D hit in hits)
         {
@@ -232,22 +233,39 @@ public class PlayerCombat : MonoBehaviour
             Enemy enemy = hit.GetComponentInParent<Enemy>();
             if (enemy != null)
             {
-                enemy.TakeDamage(isHeavy ? 2 : 1);
-                hasHitSomething = true;
+                if (!damagedParents.Contains(enemy.gameObject))
+                {
+                    enemy.TakeDamage(isHeavy ? 2 : 1);
+                    damagedParents.Add(enemy.gameObject);
+                    hasHitSomething = true;
+                }
             }
-
-            Boss boss = hit.GetComponentInParent<Boss>();
-            if (boss != null)
+            else
             {
-                boss.TakeDamage(isHeavy ? 2 : 1);
-                hasHitSomething = true;
-            }
-
-            IHittable hittableObj = hit.GetComponentInParent<IHittable>();
-            if (hittableObj != null)
-            {
-                hittableObj.OnHit(isHeavy);
-                hasHitSomething = true;
+                Boss boss = hit.GetComponentInParent<Boss>();
+                if (boss != null)
+                {
+                    if (!damagedParents.Contains(boss.gameObject))
+                    {
+                        boss.TakeDamage(isHeavy ? 2 : 1);
+                        damagedParents.Add(boss.gameObject);
+                        hasHitSomething = true;
+                    }
+                }
+                else
+                {
+                    IHittable hittableObj = hit.GetComponentInParent<IHittable>();
+                    if (hittableObj != null)
+                    {
+                        MonoBehaviour mb = hittableObj as MonoBehaviour;
+                        if (mb != null && !damagedParents.Contains(mb.gameObject))
+                        {
+                            hittableObj.OnHit(isHeavy);
+                            damagedParents.Add(mb.gameObject);
+                            hasHitSomething = true;
+                        }
+                    }
+                }
             }
 
             // Проверка на удар об стену/пол (если слой объекта называется "Ground")

@@ -5,7 +5,7 @@ using System.Collections;
 public class Boss : MonoBehaviour, IHittable
 {
     [Header("Boss Settings")]
-    [SerializeField] private int maxHealth = 20;
+    [SerializeField] private int maxHealth = 25;
     [SerializeField] private float speed = 2.5f;
 
     [Header("Сюжетный Сбор Духов (Крафт)")]

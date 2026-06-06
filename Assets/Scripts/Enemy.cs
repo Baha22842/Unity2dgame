@@ -73,6 +73,8 @@ public class Enemy : MonoBehaviour
     private Animator _animator;
     private Transform _playerTransform;
 
+    private bool _hasSpeedParam;
+
     private void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -83,6 +85,7 @@ public class Enemy : MonoBehaviour
         if (_animator != null)
         {
             _animator.applyRootMotion = false; // Фикс бага: аниматор блокировал движение физики!
+            _hasSpeedParam = HasParameter("Speed", _animator);
         }
 
         // Синхронизируем направление с начальным масштабом
@@ -94,6 +97,15 @@ public class Enemy : MonoBehaviour
         {
             boxCol.sharedMaterial = _rb.sharedMaterial;
         }
+    }
+
+    private bool HasParameter(string paramName, Animator animator)
+    {
+        foreach (AnimatorControllerParameter param in animator.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
     }
 
     private void Start()
@@ -157,6 +169,11 @@ public class Enemy : MonoBehaviour
     private void Update()
     {
         if (_currentState == EnemyState.Dead) return;
+
+        if (_animator != null && _hasSpeedParam && _rb != null)
+        {
+            _animator.SetFloat("Speed", Mathf.Abs(_rb.linearVelocity.x));
+        }
 
         if (_attackCooldownTimer > 0f) _attackCooldownTimer -= Time.deltaTime;
 

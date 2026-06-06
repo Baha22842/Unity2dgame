@@ -278,6 +278,7 @@ public class PlayerMovement : MonoBehaviour
 
     public void TakeDamage(Vector2 damageSourcePosition)
     {
+        if (GameManager.isGodMode) return;
         if (_invincibilityTimer > 0f || CurrentState == PlayerState.Dead) return;
         if (combat != null && combat.IsThrustActive) return; // Не получаем урон во время выпада (lunge/thrust attack)
 
@@ -467,11 +468,11 @@ public class PlayerMovement : MonoBehaviour
     private void HandleMovementAndJumps(float moveX, float moveY, bool isAttacking)
     {
         // 1. Dash
-        if (GameManager.Instance != null && GameManager.Instance.hasDash && Input.GetKeyDown(KeyCode.LeftShift) && _dashCooldownTimer <= 0f)
+        if (GameManager.Instance != null && (GameManager.Instance.hasDash || GameManager.isGodMode) && Input.GetKeyDown(KeyCode.LeftShift) && (_dashCooldownTimer <= 0f || GameManager.isGodMode))
         {
-            if (_isGrounded || _canDashInAir)
+            if (_isGrounded || _canDashInAir || GameManager.isGodMode)
             {
-                if (!_isGrounded) _canDashInAir = false; // Тратим воздушный рывок
+                if (!_isGrounded && !GameManager.isGodMode) _canDashInAir = false; // Тратим воздушный рывок
                 ChangeState(PlayerState.Dash);
                 return;
             }
@@ -554,7 +555,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // 5. Jump
-        if (_jumpBufferTimer > 0f && (_coyoteTimer > 0f || (!_isGrounded && _remainingJumps > 0)))
+        if (_jumpBufferTimer > 0f && (_coyoteTimer > 0f || (!_isGrounded && _remainingJumps > 0) || GameManager.isGodMode))
         {
             // Если у нас активно Coyote Time (персонаж только что сошел с края платформы),
             // этот прыжок считается полноценным первым прыжком с земли, а не двойным!
@@ -566,7 +567,7 @@ public class PlayerMovement : MonoBehaviour
                 // Это второй (двойной) прыжок
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, doubleJumpForce);
                 _isDoubleJumping = true; // Активируем флаг фиксированного прыжка
-                _remainingJumps--;
+                if (!GameManager.isGodMode) _remainingJumps--;
             }
             else
             {
@@ -584,7 +585,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // Variable Jump Height (Короткий прыжок) — блокируется для LedgeClimb и двойного прыжка (делая его фиксированным)
-        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f && CurrentState != PlayerState.LedgeClimb && !_isDoubleJumping)
+        if (Input.GetButtonUp("Jump") && rb.linearVelocity.y > 0f && CurrentState != PlayerState.LedgeClimb && (!_isDoubleJumping || GameManager.isGodMode))
         {
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y * jumpCutMultiplier);
         }
@@ -860,6 +861,7 @@ public class PlayerMovement : MonoBehaviour
     private void CheckHazardCollision(Collider2D otherCollider)
     {
         if (otherCollider == null) return;
+        if (GameManager.isGodMode) return;
 
         string name = otherCollider.gameObject.name.ToLower();
         bool isHazard = name.Contains("spike")

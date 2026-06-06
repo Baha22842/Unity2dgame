@@ -20,7 +20,6 @@ public class SpellCloud : MonoBehaviour
     [SerializeField] private float strikeActiveDuration = 0.3f;
 
     private Animator animator;
-    private bool hasStruck = false;
 
     private void Start()
     {
@@ -55,7 +54,6 @@ public class SpellCloud : MonoBehaviour
         yield return new WaitForSeconds(warningDuration);
 
         // 2. Фаза удара
-        hasStruck = true;
         Debug.Log("[SpellCloud] Таймер предупреждения истек! Запуск фазы УДАРА.", this);
 
         if (animator != null)
@@ -75,10 +73,10 @@ public class SpellCloud : MonoBehaviour
                 rb.linearVelocity = Vector2.down * strikeSpeed;
             }
             
-            // Навешиваем на снаряд SpikeTrap для нанесения урона при соприкосновении
-            if (strikeObj.GetComponent<SpikeTrap>() == null && strikeObj.GetComponent<Trap>() == null)
+            // Навешиваем на снаряд SpellDamage для нанесения урона при соприкосновении
+            if (strikeObj.GetComponent<SpellDamage>() == null)
             {
-                strikeObj.AddComponent<SpikeTrap>();
+                strikeObj.AddComponent<SpellDamage>();
             }
         }
         else if (strikeCollider != null)
@@ -87,11 +85,12 @@ public class SpellCloud : MonoBehaviour
             Debug.Log("[SpellCloud] Активация встроенного Strike Collider.", this);
             strikeCollider.enabled = true;
             
-            // Навешиваем SpikeTrap для нанесения урона, если его нет
-            if (GetComponent<SpikeTrap>() == null && GetComponent<Trap>() == null)
+            // Навешиваем SpellDamage для нанесения урона, если его нет
+            if (GetComponent<SpellDamage>() == null)
             {
-                Debug.Log("[SpellCloud] Добавление компонента SpikeTrap для нанесения урона игроку.", this);
-                gameObject.AddComponent<SpikeTrap>();
+                Debug.Log("[SpellCloud] Добавление компонента SpellDamage для нанесения урона игроку.", this);
+                SpellDamage sd = gameObject.AddComponent<SpellDamage>();
+                sd.destroyOnHit = false; // Облако уничтожается по таймеру в конце корутины, а не при первом соприкосновении
             }
 
             yield return new WaitForSeconds(strikeActiveDuration);
@@ -100,5 +99,57 @@ public class SpellCloud : MonoBehaviour
         Debug.Log("[SpellCloud] Уничтожение объекта облака.", this);
         // Удаляем тучку из памяти после завершения удара
         Destroy(gameObject);
+    }
+}
+
+public class SpellDamage : MonoBehaviour
+{
+    [SerializeField] public int damage = 1;
+    [SerializeField] public bool destroyOnHit = true;
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            PlayerMovement pm = other.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                pm.TakeDamage(transform.position);
+            }
+            if (destroyOnHit)
+            {
+                Destroy(gameObject);
+            }
+        }
+        else if (other.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        {
+            if (destroyOnHit)
+            {
+                Destroy(gameObject);
+            }
+        }
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+            if (pm != null)
+            {
+                pm.TakeDamage(transform.position);
+            }
+            if (destroyOnHit)
+            {
+                Destroy(gameObject);
+            }
+        }
+        else if (collision.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        {
+            if (destroyOnHit)
+            {
+                Destroy(gameObject);
+            }
+        }
     }
 }

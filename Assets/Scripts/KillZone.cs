@@ -9,7 +9,7 @@ public class KillZone : MonoBehaviour
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.PlayerDied();
+            GameManager.Instance.PlayerDied(true);
         }
         else
         {

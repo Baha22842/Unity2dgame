@@ -14,9 +14,12 @@ public class PotionPickup : MonoBehaviour
     [SerializeField] private GameObject pickupEffectPrefab;
 
     private bool _collected = false;
+    private Vector3 _initialPosition;
 
     private void Awake()
     {
+        _initialPosition = transform.position;
+
         // Убеждаемся, что на объекте есть коллайдер с включенным триггером, так как префаб может быть сохранен без него
         Collider2D col = GetComponent<Collider2D>();
         if (col == null)
@@ -31,6 +34,62 @@ public class PotionPickup : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        string id = GetUniqueID();
+        if (IsCollected(id))
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private string GetHierarchyPath(Transform t)
+    {
+        string path = t.name;
+        while (t.parent != null)
+        {
+            t = t.parent;
+            path = t.name + "/" + path;
+        }
+        return path;
+    }
+
+    private string GetUniqueID()
+    {
+        // Уникальный ID на основе имени сцены, пути в иерархии и начальных координат с 1 знаком после запятой
+        return string.Format("{0}_{1}_{2:F1}_{3:F1}", 
+            gameObject.scene.name,
+            GetHierarchyPath(transform),
+            _initialPosition.x,
+            _initialPosition.y
+        );
+    }
+
+    private bool IsCollected(string id)
+    {
+        int slot = SaveSystem.SelectedSlot;
+        string key = "Slot_" + slot + "_CollectedPotions";
+        string list = PlayerPrefs.GetString(key, "");
+        return list.Contains(id);
+    }
+
+    private void SaveCollection(string id)
+    {
+        int slot = SaveSystem.SelectedSlot;
+        string key = "Slot_" + slot + "_CollectedPotions";
+        string list = PlayerPrefs.GetString(key, "");
+        if (string.IsNullOrEmpty(list))
+        {
+            list = id;
+        }
+        else if (!list.Contains(id))
+        {
+            list += "," + id;
+        }
+        PlayerPrefs.SetString(key, list);
+        PlayerPrefs.Save();
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!other.CompareTag("Player")) return;
@@ -40,6 +99,9 @@ public class PotionPickup : MonoBehaviour
         {
             // Блокируем повторный сбор
             _collected = true;
+
+            string id = GetUniqueID();
+            SaveCollection(id);
 
             if (GameManager.Instance.potionsCount >= GameManager.Instance.maxPotions)
             {

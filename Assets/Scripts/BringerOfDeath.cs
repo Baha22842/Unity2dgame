@@ -44,8 +44,6 @@ public class BringerOfDeath : MonoBehaviour, IHittable
     [SerializeField] private float spellSpawnHeight = 3.5f;
     [Tooltip("Скорость снаряда (применяется только в режиме SpawnAsProjectile)")]
     [SerializeField] private float projectileSpeed = 7f;
-    [Tooltip("Время каста (задержка перед PurpleBossRangeAttack2 и спавном магии) в секундах, если не используется Animation Event")]
-    [SerializeField] private float spellCastDuration = 0.8f;
     [Tooltip("Слой земли (для точного призыва на пол под ноги игрока)")]
     [SerializeField] private LayerMask groundLayer;
 

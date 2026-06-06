@@ -14,6 +14,7 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
         PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
         PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedPotions");
         PlayerPrefs.Save();
 
         if (Instance != null)
@@ -50,6 +51,43 @@ public class GameManager : MonoBehaviour
 
     public void SaveGameData()
     {
+        bool hasPos = false;
+        float px = 0f, py = 0f, pz = 0f;
+
+        // Если игрок мертв, возрождается или находится в опасной зоне (еще не коснулся безопасной земли),
+        // сохраняем его последнюю подтвержденную безопасную позицию или точку спавна.
+        bool useSafePos = isRespawning || !hasSafePositionBeenUpdated || currentPlayer == null;
+        if (currentPlayer != null)
+        {
+            PlayerMovement pm = currentPlayer.GetComponent<PlayerMovement>();
+            if (pm != null && pm.IsDead)
+            {
+                useSafePos = true;
+            }
+        }
+
+        if (currentPlayer != null && !useSafePos)
+        {
+            hasPos = true;
+            px = currentPlayer.transform.position.x;
+            py = currentPlayer.transform.position.y;
+            pz = currentPlayer.transform.position.z;
+        }
+        else if (hasSafePositionBeenUpdated && lastSafePosition != Vector3.zero)
+        {
+            hasPos = true;
+            px = lastSafePosition.x;
+            py = lastSafePosition.y;
+            pz = lastSafePosition.z;
+        }
+        else if (playerSpawnPoint != null)
+        {
+            hasPos = true;
+            px = playerSpawnPoint.position.x;
+            py = playerSpawnPoint.position.y;
+            pz = playerSpawnPoint.position.z;
+        }
+
         SaveSystem.SaveGame(
             SaveSystem.SelectedSlot,
             score,
@@ -62,7 +100,11 @@ public class GameManager : MonoBehaviour
             hasThrust,
             collectedArtifacts,
             exploredRooms,
-            totalPlayTime
+            totalPlayTime,
+            hasPos,
+            px,
+            py,
+            pz
         );
     }
 
@@ -100,12 +142,18 @@ public class GameManager : MonoBehaviour
     [Header("Gameplay (Здоровье)")]
     public int maxHealth = 3;
 
+    [Header("Cheats / God Mode")]
+    public static bool isGodMode = false;
+
     private int score;
     private int currentHealth;
     private GameObject currentPlayer;
     private float totalPlayTime = 0f;
     private Vector3 lastSafePosition;
     private CanvasGroup fadeCanvasGroup;
+    private bool hasLoadedPosition = false;
+    private Vector3 loadedPosition;
+    private bool hasSafePositionBeenUpdated = false;
 
     public int Score => score;
     public int CurrentHealth => currentHealth;
@@ -166,6 +214,12 @@ public class GameManager : MonoBehaviour
             exploredRooms = data.exploredRooms != null ? data.exploredRooms : new System.Collections.Generic.List<string>();
             totalPlayTime = data.totalPlayTime;
 
+            if (data.hasSavedPosition)
+            {
+                hasLoadedPosition = true;
+                loadedPosition = new Vector3(data.lastPlayerX, data.lastPlayerY, data.lastPlayerZ);
+            }
+
             // Загружаем количество зелий из PlayerPrefs для этого слота
             string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
             potionsCount = PlayerPrefs.GetInt(potionsKey, 0);
@@ -188,6 +242,7 @@ public class GameManager : MonoBehaviour
             PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
             PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
             PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
+            PlayerPrefs.DeleteKey(slotPrefix + "_CollectedPotions");
             PlayerPrefs.Save();
 
             SaveGameData();
@@ -205,6 +260,12 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            isGodMode = !isGodMode;
+            Debug.Log($"🛡️ [GOD MODE] {(isGodMode ? "ENABLED" : "DISABLED")}");
+        }
+
         if (!IsGameOver && Time.timeScale > 0f)
         {
             totalPlayTime += Time.deltaTime;
@@ -224,6 +285,7 @@ public class GameManager : MonoBehaviour
             if (rb != null && Mathf.Abs(rb.linearVelocity.y) < 0.05f)
             {
                 lastSafePosition = currentPlayer.transform.position;
+                hasSafePositionBeenUpdated = true;
             }
         }
     }
@@ -235,11 +297,19 @@ public class GameManager : MonoBehaviour
             Destroy(currentPlayer);
         }
 
-        currentPlayer = Instantiate(playerPrefab, playerSpawnPoint.position, Quaternion.identity);
+        Vector3 spawnPosition = playerSpawnPoint.position;
+        if (hasLoadedPosition)
+        {
+            spawnPosition = loadedPosition;
+            hasLoadedPosition = false; // Сбрасываем, чтобы последующие спавны при смерти шли с чекпоинта
+        }
+
+        currentPlayer = Instantiate(playerPrefab, spawnPosition, Quaternion.identity);
 
         if (playerSpawnPoint != null)
         {
-            lastSafePosition = playerSpawnPoint.position;
+            lastSafePosition = spawnPosition;
+            hasSafePositionBeenUpdated = false;
         }
     }
 
@@ -340,8 +410,10 @@ public class GameManager : MonoBehaviour
 
     private bool isRespawning = false;
 
-    public void PlayerDied()
+    public void PlayerDied(bool isKillZone = false)
     {
+        if (isGodMode && !isKillZone) return;
+
         if (!isRespawning && !IsGameOver)
         {
             StartCoroutine(PlayerDiedRoutine());
@@ -358,6 +430,8 @@ public class GameManager : MonoBehaviour
 
     public void TakeDamage(int amount)
     {
+        if (isGodMode) return;
+
         currentHealth -= amount;
         SaveGameData();
         UpdateHealthUI();
@@ -372,7 +446,11 @@ public class GameManager : MonoBehaviour
     private System.Collections.IEnumerator PlayerDiedRoutine()
     {
         isRespawning = true;
-        currentHealth--;
+        
+        if (!isGodMode)
+        {
+            currentHealth--;
+        }
 
         // Применяем штраф списания духов только при окончательной потере всех жизней (Game Over)
         if (currentHealth <= 0)
@@ -381,6 +459,35 @@ public class GameManager : MonoBehaviour
             score -= lostSpirits;
             if (score < 0) score = 0;
             Debug.Log($"🏺 [ПОЛНАЯ СМЕРТЬ] Игрок потерял все жизни! Потеряно {lostSpirits} целей. духов ({soulLossPercentage * 100}%).");
+
+            SaveGameData();
+            UpdateHealthUI();
+            UpdateScoreUI();
+
+            // Восполняем здоровье боссов и мобов до фулла при смерти игрока!
+            HealAllEnemiesToFull();
+
+            // Игрок играет обычную анимацию получения урона вместо головокружения
+            if (currentPlayer != null)
+            {
+                PlayerAnimator pa = currentPlayer.GetComponent<PlayerAnimator>();
+                PlayerMovement pm = currentPlayer.GetComponent<PlayerMovement>();
+                if (pm != null)
+                {
+                    pm.FreezeMovement(1.5f); // Блокируем управление
+                }
+                if (pa != null)
+                {
+                    pa.TriggerHit();
+                }
+            }
+
+            // Ждем 0.5 секунды, чтобы проигралась анимация получения урона и отскок
+            yield return new WaitForSeconds(0.5f);
+
+            ShowLose(); // Экран смерти (Game Over) без затемнения и задержки
+            isRespawning = false;
+            yield break;
         }
         else
         {
@@ -427,7 +534,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            if (lastSafePosition != Vector3.zero)
+            if (hasSafePositionBeenUpdated && lastSafePosition != Vector3.zero)
             {
                 SpawnPlayerAtPosition(lastSafePosition);
             }
@@ -543,6 +650,7 @@ public class GameManager : MonoBehaviour
     public void LoadMainMenu()
     {
         Time.timeScale = 1f;
+        SaveGameData();
         
         if (CelesteTransition.Instance == null)
         {

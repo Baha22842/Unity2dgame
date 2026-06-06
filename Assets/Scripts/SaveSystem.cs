@@ -23,6 +23,12 @@ public class SaveData
 
     // Время в игре
     public float totalPlayTime;
+
+    // Последняя позиция игрока
+    public bool hasSavedPosition;
+    public float lastPlayerX;
+    public float lastPlayerY;
+    public float lastPlayerZ;
 }
 
 public static class SaveSystem
@@ -34,7 +40,7 @@ public static class SaveSystem
         return Application.persistentDataPath + "/game_save_slot_" + slotIndex + ".json";
     }
 
-    public static void SaveGame(int slotIndex, int _score, int _lives, int _maxHealth, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, bool _thrust, int _artifacts, System.Collections.Generic.List<string> _exploredRooms, float _totalPlayTime)
+    public static void SaveGame(int slotIndex, int _score, int _lives, int _maxHealth, int _levelIndex, bool _doubleJump, bool _dash, bool _heavyAttack, bool _thrust, int _artifacts, System.Collections.Generic.List<string> _exploredRooms, float _totalPlayTime, bool _hasSavedPosition, float _lastPlayerX, float _lastPlayerY, float _lastPlayerZ)
     {
         SaveData data = new SaveData
         {
@@ -48,7 +54,11 @@ public static class SaveSystem
             hasThrust = _thrust,
             collectedArtifacts = _artifacts,
             exploredRooms = _exploredRooms,
-            totalPlayTime = _totalPlayTime
+            totalPlayTime = _totalPlayTime,
+            hasSavedPosition = _hasSavedPosition,
+            lastPlayerX = _lastPlayerX,
+            lastPlayerY = _lastPlayerY,
+            lastPlayerZ = _lastPlayerZ
         };
 
         string json = JsonUtility.ToJson(data, true);
