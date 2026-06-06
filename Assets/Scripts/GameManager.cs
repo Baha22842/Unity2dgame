@@ -12,7 +12,12 @@ public class GameManager : MonoBehaviour
         if (Instance != null)
         {
             Instance.score = 0;
-            Instance.currentHealth = Instance.maxHealth;
+            Instance.maxHealth = 3;
+            Instance.currentHealth = 3;
+            Instance.hasDoubleJump = false;
+            Instance.hasDash = false;
+            Instance.hasHeavyAttack = false;
+            Instance.hasThrust = false;
             Instance.collectedArtifacts = 0;
             Instance.totalPlayTime = 0f;
             Instance.potionsCount = 0;

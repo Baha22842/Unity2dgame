@@ -15,6 +15,22 @@ public class PotionPickup : MonoBehaviour
 
     private bool _collected = false;
 
+    private void Awake()
+    {
+        // Убеждаемся, что на объекте есть коллайдер с включенным триггером, так как префаб может быть сохранен без него
+        Collider2D col = GetComponent<Collider2D>();
+        if (col == null)
+        {
+            BoxCollider2D boxCol = gameObject.AddComponent<BoxCollider2D>();
+            boxCol.isTrigger = true;
+            boxCol.size = new Vector2(0.5f, 0.5f);
+        }
+        else
+        {
+            col.isTrigger = true;
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!other.CompareTag("Player")) return;

@@ -163,6 +163,7 @@ public class PlayerMovement : MonoBehaviour
         else if (CurrentState == PlayerState.LedgeGrab)
         {
             rb.gravityScale = defaultGravity;
+            _coyoteTimer = 0f; // Clear coyote timer when exiting ledge grab to prevent double/triple jump glitch
             if (newState == PlayerState.Fall)
             {
                 _ledgeGrabCooldownTimer = ledgeGrabCooldown;
@@ -216,6 +217,7 @@ public class PlayerMovement : MonoBehaviour
         else if (CurrentState == PlayerState.LedgeClimb)
         {
             rb.gravityScale = defaultGravity;
+            _jumpBufferTimer = 0f; // Clear jump buffer to prevent immediate double jump from climb input
 
             // Снижаем высоту траектории подъема если над конечной платформой низкий потолок
             float climbHeightMul = 0.85f;
@@ -373,7 +375,7 @@ public class PlayerMovement : MonoBehaviour
         if (_ladderCooldownTimer > 0f) _ladderCooldownTimer -= Time.deltaTime;
         if (_ledgeGrabCooldownTimer > 0f) _ledgeGrabCooldownTimer -= Time.deltaTime;
 
-        bool resetJumps = _isGrounded || IsPhysicallyOnPlatform() || CurrentState == PlayerState.LedgeGrab || CurrentState == PlayerState.LedgeClimb;
+        bool resetJumps = _isGrounded || IsPhysicallyOnPlatform() || CurrentState == PlayerState.LedgeGrab;
         if (resetJumps)
         {
             _coyoteTimer = coyoteTime;

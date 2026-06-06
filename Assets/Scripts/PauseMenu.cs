@@ -44,6 +44,16 @@ public class PauseMenu : MonoBehaviour
         return null;
     }
 
+    private GameObject FindChildByNames(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            GameObject obj = FindChildByName(name);
+            if (obj != null) return obj;
+        }
+        return null;
+    }
+
     // Рекурсивный поиск кнопок по имени для автонастройки
     private Button FindButtonByName(string btnName)
     {
@@ -60,22 +70,25 @@ public class PauseMenu : MonoBehaviour
         return null;
     }
 
+    private Button FindButtonByNames(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            Button btn = FindButtonByName(name);
+            if (btn != null) return btn;
+        }
+        return null;
+    }
+
     private void Awake()
     {
         isPaused = false;
         Time.timeScale = 1f;
 
-        // Автоматический поиск панелей, если они пропущены в Инспекторе
-        if (pausePanel == null) pausePanel = FindChildByName("PausePanel");
-        if (pausePanel == null) pausePanel = FindChildByName("PauseMenuPanel");
-        if (pausePanel == null) pausePanel = FindChildByName("Background");
-
-        if (pauseButtonsPanel == null) pauseButtonsPanel = FindChildByName("PauseButtonsPanel");
-        if (pauseButtonsPanel == null) pauseButtonsPanel = FindChildByName("ButtonsPanel");
-        if (pauseButtonsPanel == null) pauseButtonsPanel = FindChildByName("MainPanel");
-
-        if (settingsPanel == null) settingsPanel = FindChildByName("SettingsPanel");
-        if (settingsPanel == null) settingsPanel = FindChildByName("Settings");
+        // Автоматический поиск панелей с поддержкой русского языка
+        if (pausePanel == null) pausePanel = FindChildByNames("PausePanel", "PauseMenuPanel", "Background", "ПанельПаузы", "Пауза");
+        if (pauseButtonsPanel == null) pauseButtonsPanel = FindChildByNames("PauseButtonsPanel", "ButtonsPanel", "MainPanel", "КнопкиПаузы", "ГлавнаяПанель");
+        if (settingsPanel == null) settingsPanel = FindChildByNames("SettingsPanel", "Settings", "Настройки", "ПанельНастроек");
 
         if (pausePanel != null) pausePanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
@@ -90,47 +103,33 @@ public class PauseMenu : MonoBehaviour
         // Автоматический поиск элементов настроек, если они пусты
         if (musicSlider == null)
         {
-            musicSlider = FindChildByName("MusicSlider")?.GetComponent<Slider>();
-            if (musicSlider == null) musicSlider = FindChildByName("VolumeSlider")?.GetComponent<Slider>();
+            musicSlider = FindChildByNames("MusicSlider", "VolumeSlider", "СлайдерМузыки", "ГромкостьМузыки")?.GetComponent<Slider>();
             if (musicSlider == null) musicSlider = GetComponentInChildren<Slider>(true);
         }
 
         if (sfxSlider == null)
         {
-            sfxSlider = FindChildByName("SFXSlider")?.GetComponent<Slider>();
-            if (sfxSlider == null) sfxSlider = FindChildByName("SoundSlider")?.GetComponent<Slider>();
+            sfxSlider = FindChildByNames("SFXSlider", "SoundSlider", "СлайдерЗвуков", "ГромкостьЗвуков")?.GetComponent<Slider>();
         }
 
         if (fullscreenToggle == null) fullscreenToggle = GetComponentInChildren<Toggle>(true);
         if (musicDropDown == null) musicDropDown = GetComponentInChildren<TMP_Dropdown>(true);
 
-        // Автоматический поиск кнопок по имени
-        if (resumeButton == null) resumeButton = FindButtonByName("ResumeButton");
-        if (resumeButton == null) resumeButton = FindButtonByName("Resume");
+        // Автоматический поиск кнопок по имени с поддержкой русского языка
+        if (resumeButton == null) resumeButton = FindButtonByNames("ResumeButton", "Resume", "Продолжить", "Prodoljit");
+        if (settingsButton == null) settingsButton = FindButtonByNames("SettingsButton", "Settings", "Настройки", "Nastroiki");
+        if (closeSettingsButton == null) closeSettingsButton = FindButtonByNames("CloseSettingsButton", "CloseButton", "BackButton", "Назад", "Nazad", "Закрыть", "Zakryt");
+        if (restartButton == null) restartButton = FindButtonByNames("RestartButton", "Restart", "Заново", "Zanovo", "Рестарт");
+        if (mainMenuButton == null) mainMenuButton = FindButtonByNames("MainMenuButton", "MenuButton", "MainMenu", "Меню", "Menu");
+        if (quitButton == null) quitButton = FindButtonByNames("QuitButton", "Quit", "Выход", "Vyhod");
 
-        if (settingsButton == null) settingsButton = FindButtonByName("SettingsButton");
-        if (settingsButton == null) settingsButton = FindButtonByName("Settings");
-
-        if (closeSettingsButton == null) closeSettingsButton = FindButtonByName("CloseSettingsButton");
-        if (closeSettingsButton == null) closeSettingsButton = FindButtonByName("CloseButton");
-        if (closeSettingsButton == null) closeSettingsButton = FindButtonByName("BackButton");
-
-        if (restartButton == null) restartButton = FindButtonByName("RestartButton");
-        if (restartButton == null) restartButton = FindButtonByName("Restart");
-
-        if (mainMenuButton == null) mainMenuButton = FindButtonByName("MainMenuButton");
-        if (mainMenuButton == null) mainMenuButton = FindButtonByName("MenuButton");
-
-        if (quitButton == null) quitButton = FindButtonByName("QuitButton");
-        if (quitButton == null) quitButton = FindButtonByName("Quit");
-
-        // Динамическая привязка методов к событиям нажатия (onClick)
-        if (resumeButton != null) resumeButton.onClick.AddListener(Resume);
-        if (settingsButton != null) settingsButton.onClick.AddListener(OpenSettings);
-        if (closeSettingsButton != null) closeSettingsButton.onClick.AddListener(CloseSettings);
-        if (restartButton != null) restartButton.onClick.AddListener(RestartLevel);
-        if (mainMenuButton != null) mainMenuButton.onClick.AddListener(GoToMainMenu);
-        if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
+        // Очищаем существующие слушатели и привязываем методы динамически
+        if (resumeButton != null) { resumeButton.onClick.RemoveAllListeners(); resumeButton.onClick.AddListener(Resume); }
+        if (settingsButton != null) { settingsButton.onClick.RemoveAllListeners(); settingsButton.onClick.AddListener(OpenSettings); }
+        if (closeSettingsButton != null) { closeSettingsButton.onClick.RemoveAllListeners(); closeSettingsButton.onClick.AddListener(CloseSettings); }
+        if (restartButton != null) { restartButton.onClick.RemoveAllListeners(); restartButton.onClick.AddListener(RestartLevel); }
+        if (mainMenuButton != null) { mainMenuButton.onClick.RemoveAllListeners(); mainMenuButton.onClick.AddListener(GoToMainMenu); }
+        if (quitButton != null) { quitButton.onClick.RemoveAllListeners(); quitButton.onClick.AddListener(QuitGame); }
 
         // Загружаем настройки звука
         if (musicSlider != null)
