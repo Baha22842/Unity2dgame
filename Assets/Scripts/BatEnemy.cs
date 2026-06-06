@@ -26,7 +26,7 @@ public class BatEnemy : MonoBehaviour, IHittable
     [SerializeField] private float attackRadius = 1.5f;
     [SerializeField] private float attackRange = 2.2f;
     [SerializeField] private float attackCooldown = 2f;
-    [SerializeField] private float attackDuration = 0.5f;
+    [SerializeField] private float attackDuration = 0.3f;
     [SerializeField] private LayerMask playerLayer;
     [SerializeField] private LayerMask groundLayer = 1 << 7;
 
@@ -151,8 +151,7 @@ public class BatEnemy : MonoBehaviour, IHittable
                 }
             }
 
-            Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
-            bool isPlayerInStrikeZone = Physics2D.OverlapCircle(checkPos, attackRadius, playerLayer) != null;
+            bool isPlayerInStrikeZone = distanceToPlayer <= attackRange;
 
             if (isPlayerInStrikeZone && _cooldownTimer <= 0f)
             {
@@ -435,11 +434,35 @@ public class BatEnemy : MonoBehaviour, IHittable
     private void OnCollisionEnter2D(Collision2D collision)
     {
         IgnoreHazardCollision(collision.collider);
+
+        if (!_isDead && _hitStunTimer <= 0f)
+        {
+            if (collision.gameObject.CompareTag("Player"))
+            {
+                PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+                if (pm != null)
+                {
+                    pm.TakeDamage(transform.position);
+                }
+            }
+        }
     }
 
     private void OnCollisionStay2D(Collision2D collision)
     {
         IgnoreHazardCollision(collision.collider);
+
+        if (!_isDead && _hitStunTimer <= 0f)
+        {
+            if (collision.gameObject.CompareTag("Player"))
+            {
+                PlayerMovement pm = collision.gameObject.GetComponent<PlayerMovement>();
+                if (pm != null)
+                {
+                    pm.TakeDamage(transform.position);
+                }
+            }
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
