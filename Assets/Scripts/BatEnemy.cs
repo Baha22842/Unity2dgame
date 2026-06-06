@@ -109,7 +109,7 @@ public class BatEnemy : MonoBehaviour, IHittable
         if (_hitStunTimer > 0f)
         {
             _hitStunTimer -= Time.deltaTime;
-            if (_animator != null) _animator.Play("BatHit");
+            PlayAnim("BatHit");
             return;
         }
 
@@ -119,34 +119,35 @@ public class BatEnemy : MonoBehaviour, IHittable
         {
             // Во время анимации атаки зависаем
             _rb.linearVelocity = Vector2.zero;
-            if (_animator != null) _animator.Play("BatAttack");
+            PlayAnim("BatAttack");
             return;
         }
 
         // По умолчанию проигрываем анимацию полета в воздухе
-        if (_animator != null)
-        {
-            _animator.Play("BatFlying");
-        }
+        PlayAnim("BatFlying");
 
         if (_playerTransform == null) return;
 
         float distanceToPlayer = Vector2.Distance(transform.position, _playerTransform.position);
         float distanceFromStart = Vector2.Distance(transform.position, _startPosition);
 
-        // Мышь преследует только если игрок близко И сама мышь не улетела дальше своей зоны привязки
-        bool shouldChase = distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange;
+        // Мышь преследует только если игрок близко, мышь не в режиме возврата, и она не улетела дальше зоны привязки
+        bool shouldChase = distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange && !_isReturning;
 
         if (shouldChase)
         {
             _isReturning = false; // Сбрасываем возврат при аггро
             _patrolWaitTimer = 0f; // Сбрасываем ожидание патруля
 
-            // Поворот к игроку
-            float dirToPlayer = Mathf.Sign(_playerTransform.position.x - transform.position.x);
-            if ((int)dirToPlayer != _facingDirection)
+            // Поворот к игроку с порогом (deadzone), чтобы исключить мерцание при пересечении координат
+            float xDiff = _playerTransform.position.x - transform.position.x;
+            if (Mathf.Abs(xDiff) > 0.15f)
             {
-                SetFacingDirection((int)dirToPlayer);
+                int dirToPlayer = (int)Mathf.Sign(xDiff);
+                if (dirToPlayer != _facingDirection)
+                {
+                    SetFacingDirection(dirToPlayer);
+                }
             }
 
             Vector3 checkPos = attackPoint != null ? attackPoint.position : transform.position;
@@ -246,11 +247,8 @@ public class BatEnemy : MonoBehaviour, IHittable
         _isAttacking = true;
         _rb.linearVelocity = Vector2.zero;
 
-        // Запуск анимации атаки напрямую по названию состояния
-        if (_animator != null)
-        {
-            _animator.Play("BatAttack");
-        }
+        // Запуск анимации атаки
+        PlayAnim("BatAttack");
 
         // Ждем длительность анимации атаки
         yield return new WaitForSeconds(attackDuration);
@@ -326,6 +324,7 @@ public class BatEnemy : MonoBehaviour, IHittable
                 _rb.linearVelocity = new Vector2(knockbackDir * knockbackForce.x, knockbackForce.y);
                 _hitStunTimer = 0.25f; // Оглушение на 0.25 сек, чтобы дать мыши отлететь назад
             }
+            PlayAnim("BatHit");
             StartCoroutine(FlashRed());
         }
     }
@@ -354,10 +353,7 @@ public class BatEnemy : MonoBehaviour, IHittable
             col.enabled = false;
         }
 
-        if (_animator != null)
-        {
-            _animator.Play("BatDie");
-        }
+        PlayAnim("BatDie");
 
         // Спавним сферы духов при гибели
         if (spiritOrbPrefab != null)
@@ -514,5 +510,15 @@ public class BatEnemy : MonoBehaviour, IHittable
         }
 
         return desiredVelocity;
+    }
+
+    private string _currentAnimState = "";
+    private void PlayAnim(string stateName)
+    {
+        if (_animator == null) return;
+        if (_currentAnimState == stateName) return;
+
+        _animator.Play(stateName);
+        _currentAnimState = stateName;
     }
 }
