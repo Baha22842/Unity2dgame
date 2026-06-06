@@ -17,6 +17,34 @@ public class AbilityOrb : MonoBehaviour
     [Tooltip("Партиклы или префаб, который появится при взятии сферы")]
     public GameObject pickupEffectPrefab;
 
+    private void Start()
+    {
+        if (GameManager.Instance != null)
+        {
+            bool alreadyUnlocked = false;
+            switch (abilityToUnlock)
+            {
+                case AbilityType.DoubleJump:
+                    alreadyUnlocked = GameManager.Instance.hasDoubleJump;
+                    break;
+                case AbilityType.Dash:
+                    alreadyUnlocked = GameManager.Instance.hasDash;
+                    break;
+                case AbilityType.HeavyAttack:
+                    alreadyUnlocked = GameManager.Instance.hasHeavyAttack;
+                    break;
+                case AbilityType.Thrust:
+                    alreadyUnlocked = GameManager.Instance.hasThrust;
+                    break;
+            }
+
+            if (alreadyUnlocked)
+            {
+                Destroy(gameObject);
+            }
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D collider)
     {
         if (collider.CompareTag("Player"))

@@ -216,6 +216,11 @@ public class MainMenu : MonoBehaviour
     public void DeleteSlot(int slotIndex)
     {
         SaveSystem.DeleteSave(slotIndex);
+        string slotPrefix = "Slot_" + slotIndex;
+        PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
+        PlayerPrefs.Save();
         UpdateSaveSlotsUI();
     }
 

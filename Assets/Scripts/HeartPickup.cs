@@ -23,6 +23,17 @@ public class HeartPickup : MonoBehaviour
         if (!other.CompareTag("Player")) return;
         if (_collected) return;
 
+        if (GameManager.Instance != null)
+        {
+            bool isFull = GameManager.Instance.IsHealthFull;
+
+            if (isFull && collectOnlyWhenHurt)
+            {
+                // Игрок здоров, и мы настроили не подбирать сердце зря
+                return;
+            }
+        }
+
         _collected = true;
 
         if (GameManager.Instance != null)
@@ -31,17 +42,9 @@ public class HeartPickup : MonoBehaviour
 
             if (isFull)
             {
-                if (collectOnlyWhenHurt)
-                {
-                    // Игрок здоров, и мы настроили не подбирать сердце зря
-                    return;
-                }
-                else
-                {
-                    // Игрок здоров, но подбор разрешен -> конвертируем сердце в очки!
-                    GameManager.Instance.AddScore(scoreIfFullHealth);
-                    Debug.Log($"Здоровье полно! Сердце сконвертировано в +{scoreIfFullHealth} очков.");
-                }
+                // Игрок здоров, но подбор разрешен -> конвертируем сердце в очки!
+                GameManager.Instance.AddScore(scoreIfFullHealth);
+                Debug.Log($"Здоровье полно! Сердце сконвертировано в +{scoreIfFullHealth} очков.");
             }
             else
             {

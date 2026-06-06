@@ -9,6 +9,13 @@ public class GameManager : MonoBehaviour
     public static void ResetProgress()
     {
         SaveSystem.DeleteSave(SaveSystem.SelectedSlot);
+        
+        string slotPrefix = "Slot_" + SaveSystem.SelectedSlot;
+        PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
+        PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
+        PlayerPrefs.Save();
+
         if (Instance != null)
         {
             Instance.score = 0;
@@ -21,10 +28,6 @@ public class GameManager : MonoBehaviour
             Instance.collectedArtifacts = 0;
             Instance.totalPlayTime = 0f;
             Instance.potionsCount = 0;
-
-            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
-            PlayerPrefs.DeleteKey(potionsKey);
-            PlayerPrefs.Save();
 
             Instance.SaveGameData();
         }
@@ -181,8 +184,10 @@ public class GameManager : MonoBehaviour
             totalPlayTime = 0f;
 
             potionsCount = 0;
-            string potionsKey = "Slot_" + SaveSystem.SelectedSlot + "_Potions";
-            PlayerPrefs.DeleteKey(potionsKey);
+            string slotPrefix = "Slot_" + SaveSystem.SelectedSlot;
+            PlayerPrefs.DeleteKey(slotPrefix + "_Potions");
+            PlayerPrefs.DeleteKey(slotPrefix + "_CollectedHearts");
+            PlayerPrefs.DeleteKey(slotPrefix + "_CollectedArtifacts");
             PlayerPrefs.Save();
 
             SaveGameData();
