@@ -109,22 +109,30 @@ public class BatEnemy : MonoBehaviour, IHittable
         if (_hitStunTimer > 0f)
         {
             _hitStunTimer -= Time.deltaTime;
+            if (_animator != null) _animator.Play("BatHit");
             return;
         }
 
         if (_cooldownTimer > 0f) _cooldownTimer -= Time.deltaTime;
 
-        if (_playerTransform == null) return;
-
-        float distanceToPlayer = Vector2.Distance(transform.position, _playerTransform.position);
-        float distanceFromStart = Vector2.Distance(transform.position, _startPosition);
-
         if (_isAttacking)
         {
             // Во время анимации атаки зависаем
             _rb.linearVelocity = Vector2.zero;
+            if (_animator != null) _animator.Play("BatAttack");
             return;
         }
+
+        // По умолчанию проигрываем анимацию полета в воздухе
+        if (_animator != null)
+        {
+            _animator.Play("BatFlying");
+        }
+
+        if (_playerTransform == null) return;
+
+        float distanceToPlayer = Vector2.Distance(transform.position, _playerTransform.position);
+        float distanceFromStart = Vector2.Distance(transform.position, _startPosition);
 
         // Мышь преследует только если игрок близко И сама мышь не улетела дальше своей зоны привязки
         bool shouldChase = distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange;
@@ -238,10 +246,10 @@ public class BatEnemy : MonoBehaviour, IHittable
         _isAttacking = true;
         _rb.linearVelocity = Vector2.zero;
 
-        // Запуск анимации атаки (триггер Attack)
+        // Запуск анимации атаки напрямую по названию состояния
         if (_animator != null)
         {
-            _animator.SetTrigger("Attack");
+            _animator.Play("BatAttack");
         }
 
         // Ждем длительность анимации атаки
@@ -348,7 +356,7 @@ public class BatEnemy : MonoBehaviour, IHittable
 
         if (_animator != null)
         {
-            _animator.SetBool("IsDead", true);
+            _animator.Play("BatDie");
         }
 
         // Спавним сферы духов при гибели
