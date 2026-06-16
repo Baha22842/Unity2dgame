@@ -10,7 +10,23 @@ public class Trap : MonoBehaviour
         }
     }
 
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            KillPlayer();
+        }
+    }
+
     private void OnTriggerEnter2D(Collider2D collider)
+    {
+        if (collider.CompareTag("Player"))
+        {
+            KillPlayer();
+        }
+    }
+
+    private void OnTriggerStay2D(Collider2D collider)
     {
         if (collider.CompareTag("Player"))
         {

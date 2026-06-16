@@ -30,7 +30,8 @@ public class GameManager : MonoBehaviour
             Instance.totalPlayTime = 0f;
             Instance.potionsCount = 0;
 
-            Instance.SaveGameData();
+            // Мы НЕ вызываем SaveGameData() здесь, чтобы игра при перезапуске уровня сбросила checkpoint 
+            // и дала возможность новому GameManager в Awake() создать чистый файл сохранения.
         }
     }
 
@@ -284,8 +285,33 @@ public class GameManager : MonoBehaviour
             Rigidbody2D rb = currentPlayer.GetComponent<Rigidbody2D>();
             if (rb != null && Mathf.Abs(rb.linearVelocity.y) < 0.05f)
             {
-                lastSafePosition = currentPlayer.transform.position;
-                hasSafePositionBeenUpdated = true;
+                // Проверяем, что под ногами действительно твердая и плоская земля (не вертикальная стена)
+                Vector2 checkOrigin = (Vector2)currentPlayer.transform.position + Vector2.up * 0.5f;
+                RaycastHit2D hit = Physics2D.Raycast(checkOrigin, Vector2.down, 1.5f, pm.GroundLayer);
+                
+                if (hit.collider != null && hit.normal.y > 0.9f)
+                {
+                    // Дополнительно проверяем, что в этой точке нет опасных объектов (шипов, ловушек)
+                    bool isNearHazard = false;
+                    Collider2D[] colliders = Physics2D.OverlapCircleAll(currentPlayer.transform.position, 0.8f);
+                    foreach (var col in colliders)
+                    {
+                        if (col == null) continue;
+                        string name = col.gameObject.name.ToLower();
+                        if (name.Contains("spike") || name.Contains("trap") || name.Contains("hazard") ||
+                            col.GetComponent<SpikeTrap>() != null || col.GetComponent<Trap>() != null)
+                        {
+                            isNearHazard = true;
+                            break;
+                        }
+                    }
+
+                    if (!isNearHazard)
+                    {
+                        lastSafePosition = currentPlayer.transform.position;
+                        hasSafePositionBeenUpdated = true;
+                    }
+                }
             }
         }
     }
@@ -547,6 +573,15 @@ public class GameManager : MonoBehaviour
                 RestartLevel();
             }
 
+            if (currentPlayer != null)
+            {
+                PlayerMovement pm = currentPlayer.GetComponent<PlayerMovement>();
+                if (pm != null)
+                {
+                    pm.FreezeMovement(1.1f); // 0.3s camera stabilization + 0.8s fade-in
+                }
+            }
+
             // Ждем 0.3 секунды в полной темноте для стабилизации камеры
             yield return new WaitForSeconds(0.3f);
         }
@@ -613,9 +648,40 @@ public class GameManager : MonoBehaviour
 
     public void RestartLevel()
     {
-        ResetProgress();
+        // Вместо сброса всего прогресса и перезагрузки сцены:
+        // 1. Восстанавливаем здоровье до максимума
+        currentHealth = maxHealth;
+        
+        // 2. Сбрасываем флаг окончания игры и закрываем панель
+        IsGameOver = false;
+        if (losePanel != null)
+        {
+            losePanel.SetActive(false);
+        }
+        
+        // 3. Запускаем время назад
         Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        
+        // 4. Сбрасываем сохраненную позицию, чтобы игрок появился на стартовой точке
+        hasLoadedPosition = false;
+        if (playerSpawnPoint != null)
+        {
+            lastSafePosition = playerSpawnPoint.position;
+            hasSafePositionBeenUpdated = false;
+        }
+        
+        // 5. Пересоздаем игрока на стартовой точке (это выводит его из состояния Dead и сбрасывает скрипты)
+        SpawnPlayer();
+        
+        // 6. Восстанавливаем здоровье всех живых монстров на сцене
+        HealAllEnemiesToFull();
+        
+        // 7. Сохраняем новые чистые данные (здоровье полное, штраф душ сохранен, позиция — старт)
+        SaveGameData();
+        
+        // 8. Обновляем интерфейс здоровья и очков
+        UpdateHealthUI();
+        UpdateScoreUI();
     }
 
     public void LoadNextLevel()

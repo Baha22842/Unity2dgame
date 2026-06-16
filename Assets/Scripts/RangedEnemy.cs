@@ -34,11 +34,15 @@ public class RangedEnemy : MonoBehaviour
 
     private void Update()
     {
-        if (player == null) return;
+        if (player == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) player = p.transform;
+        }
 
-        float distToPlayer = Vector2.Distance(transform.position, player.position);
+        float distToPlayer = player != null ? Vector2.Distance(transform.position, player.position) : float.MaxValue;
 
-        if (distToPlayer <= detectionRange)
+        if (player != null && distToPlayer <= detectionRange)
         {
             // Stop and shoot
             if (rb != null) rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);

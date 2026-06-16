@@ -170,6 +170,13 @@ public class Enemy : MonoBehaviour
     {
         if (_currentState == EnemyState.Dead) return;
 
+        // Находим игрока динамически, если ссылка потеряна (например, после смерти и спавна нового игрока)
+        if (_playerTransform == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) _playerTransform = p.transform;
+        }
+
         if (_animator != null && _hasSpeedParam && _rb != null)
         {
             _animator.SetFloat("Speed", Mathf.Abs(_rb.linearVelocity.x));

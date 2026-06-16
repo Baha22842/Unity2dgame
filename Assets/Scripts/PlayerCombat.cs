@@ -60,7 +60,7 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
-        if (pm.IsDead || pm.CurrentState == PlayerMovement.PlayerState.PowerUp) return;
+        if (pm.IsDead || pm.CurrentState == PlayerMovement.PlayerState.PowerUp || pm.IsMovementFrozen) return;
 
         UpdateLungeAndCombo();
 

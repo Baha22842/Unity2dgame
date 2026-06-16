@@ -17,6 +17,8 @@ public class PlayerMovement : MonoBehaviour
     public bool IsPushing => _isPushing;
     public bool IsRollFalling => _isRollFalling;
     public bool IsShielding => Input.GetMouseButton(1) && _isGrounded && CurrentState != PlayerState.Dead && CurrentState != PlayerState.PowerUp && CurrentState != PlayerState.Hit;
+    public bool IsMovementFrozen => _freezeTimer > 0f;
+    public LayerMask GroundLayer => groundLayer;
 
     // Events for better architecture
     public event Action<PlayerState> OnStateChanged;
@@ -348,7 +350,7 @@ public class PlayerMovement : MonoBehaviour
             ChangeState(_isGrounded ? PlayerState.Idle : PlayerState.Fall);
         }
 
-        if (Input.GetKeyDown(KeyCode.Q) && CurrentState != PlayerState.Climb && CurrentState != PlayerState.Dead && CurrentState != PlayerState.PowerUp && CurrentState != PlayerState.Drink && CurrentState != PlayerState.Hit)
+        if (Input.GetKeyDown(KeyCode.Q) && _isGrounded && CurrentState != PlayerState.Climb && CurrentState != PlayerState.Dead && CurrentState != PlayerState.PowerUp && CurrentState != PlayerState.Drink && CurrentState != PlayerState.Hit)
         {
             if (GameManager.Instance != null && GameManager.Instance.potionsCount > 0 && GameManager.Instance.CurrentHealth < GameManager.Instance.maxHealth)
             {
@@ -879,6 +881,12 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void OnTriggerStay2D(Collider2D collider)
+    {
+        if (collider.CompareTag("Ladder")) _isNearLadder = true;
+        CheckHazardCollision(collider);
+    }
+
     private void OnTriggerExit2D(Collider2D collider)
     {
         if (collider.CompareTag("Ladder"))
@@ -889,6 +897,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnCollisionStay2D(Collision2D collision)
     {
+        CheckHazardCollision(collision.collider);
         if (collision.gameObject.CompareTag("Box"))
         {
             bool isTouchingSide = false;

@@ -127,13 +127,18 @@ public class BatEnemy : MonoBehaviour, IHittable
         // По умолчанию проигрываем анимацию полета в воздухе
         PlayAnim("BatFlying");
 
-        if (_playerTransform == null) return;
+        // Находим игрока динамически, если ссылка была потеряна (например, после респавна)
+        if (_playerTransform == null)
+        {
+            GameObject p = GameObject.FindGameObjectWithTag("Player");
+            if (p != null) _playerTransform = p.transform;
+        }
 
-        float distanceToPlayer = Vector2.Distance(transform.position, _playerTransform.position);
+        float distanceToPlayer = _playerTransform != null ? Vector2.Distance(transform.position, _playerTransform.position) : float.MaxValue;
         float distanceFromStart = Vector2.Distance(transform.position, _startPosition);
 
         // Мышь преследует только если игрок близко, мышь не в режиме возврата, и она не улетела дальше зоны привязки
-        bool shouldChase = distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange && !_isReturning;
+        bool shouldChase = _playerTransform != null && distanceToPlayer <= aggroRange && distanceFromStart <= tetherRange && !_isReturning;
 
         if (shouldChase)
         {
